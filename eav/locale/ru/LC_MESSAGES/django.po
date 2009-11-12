@@ -1,0 +1,93 @@
+# Online catalogue, Russian localization.
+# Copyright (C) 2009 Andy Mikhailenko
+# This file is distributed under the same license as the catalogue package.
+# Andy Mikhailenko <andy@neithere.net>, 2009
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2009-11-12 22:52+0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: Andy Mikhailenko <andy@neithere.net>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: forms.py:30
+#, python-format
+msgid "Attribute name must not clash with reserved names (\"%s\")"
+msgstr "Имя атрибута не должно относиться к зарезервированным (\"%s\")"
+
+#: models.py:26
+msgid "text"
+msgstr "текст"
+
+#: models.py:27
+msgid "number"
+msgstr "число"
+
+#: models.py:28
+msgid "date"
+msgstr "дата"
+
+#: models.py:29
+msgid "boolean"
+msgstr "логическое значение"
+
+#: models.py:31
+msgid "title"
+msgstr "заголовок"
+
+#: models.py:31
+msgid "user-friendly attribute name"
+msgstr "название атрибута, отображаемое на сайте"
+
+#: models.py:32
+msgid "name"
+msgstr "имя поля"
+
+#: models.py:34
+msgid "help text"
+msgstr "подсказка"
+
+#: models.py:35
+msgid "short description for administrator"
+msgstr "краткое описание для администратора"
+
+#: models.py:36
+msgid "data type"
+msgstr "тип данных"
+
+#: models.py:37 models.py:48
+msgid "required"
+msgstr "обязателен"
+
+#: models.py:38
+msgid "include in search"
+msgstr "разрешить поиск"
+
+#: models.py:39
+msgid "include in filters"
+msgstr "разрешить фильтрацию"
+
+#: models.py:40
+msgid "allow sorting"
+msgstr "разрешить сортировку"
+
+#: models.py:43
+msgid "attribute schema"
+msgstr "схема атрибута"
+
+#: models.py:43
+msgid "attribute schemata"
+msgstr "схемы атрибутов"
+
+#: models.py:241
+msgid "attribute"
+msgstr "атрибут"
+
+#: models.py:241
+msgid "attributes"
+msgstr "атрибуты"
