@@ -73,7 +73,7 @@ class BaseDynamicEntityForm(ModelForm):
             return True
 
     def get_schemata(self):
-        return Schema.objects.all()
+        self.instance.schemata if self.instance else []
 
     def _build_dynamic_fields(self):
         # reset form fields
@@ -97,9 +97,9 @@ class BaseDynamicEntityForm(ModelForm):
             self.fields[schema.name] = MappedField(**defaults)
 
             # fill initial data (if attribute was already defined)
-            entity_attr = self.instance.all_attributes.get(schema.name)
-            if entity_attr:
-                self.initial[schema.name] = entity_attr.value
+            value = getattr(self.instance, schema.name)
+            if value:
+                self.initial[schema.name] = value
 
 
     def save(self, commit=True):
@@ -117,21 +117,18 @@ class BaseDynamicEntityForm(ModelForm):
             raise ValueError("The %s could not be saved because the data didn't"
                             " validate." % self.instance._meta.object_name)
 
-        # save entity instance
-        obj = super(BaseDynamicEntityForm, self).save(commit=True)    # Note: commit forced
-        obj_ct = dict(content_type=obj.attrs.content_type, object_id=obj.pk)
+        # create entity instance
+        instance = super(BaseDynamicEntityForm, self).save(commit=False)
 
-        # save Attr instances
-        # XXX we ignore commit=False because it may mean unchanged static attrs
-        schemata = self.get_schemata()
-        for schema in schemata:
-            #attr, _ = Attr.objects.get_or_create(schema=schema)#, content_object=obj)
-            attr, _ = Attr.objects.get_or_create(schema=schema, **obj_ct)
-            f = attr._meta.get_field('value_%s' % schema.datatype)
-            f.save_form_data(attr, self.cleaned_data.get(schema.name))
-            attr.save()
+        # assign attributes
+        for name in instance.schema_names:
+            value = self.cleaned_data.get(name)
+            setattr(instance, name, value)
 
-        return obj
+        # save entity and its attributes
+        instance.save()      # save again, this time with attrs   TODO can we create instance and save it only now?
+
+        return instance
     save.alters_data = True
 
     def save_m2m(*a, **kw):
