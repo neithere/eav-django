@@ -69,6 +69,7 @@ class EntityManager(Manager):
         ...where `rubric` is a ForeignKey field, and `colour` is the name of an
         EAV attribute represented by Schema and Attr models.
         """
+        #print '%s.by_attributes(%s)' % (self.model._meta.object_name, kwargs)
         q = self.all()
         fields   = self.model._meta.get_all_field_names()
         schemata = dict((s.name, s) for s in self.model.schema_model.objects.all())
@@ -108,6 +109,8 @@ class EntityManager(Manager):
         Note that we cannot create attribute with no pre-defined schema because
         we must know attribute type in order to properly put value into the DB.
         """
+        #print '%s.create(%s)' % (self.model._meta.object_name, kwargs)
+
         fields = self.model._meta.get_all_field_names()
         schemata = dict((s.name, s) for s in self.model.schema_model.objects.all())
 
@@ -150,42 +153,9 @@ class AttrDescriptor(object):
 class BaseEntity(Model):
     """
     Entity, the "E" in EAV. This model is abstract and must be subclassed.
+    See tests for examples.
 
-    Usage::
-
-        >>> class Rubric(Model):
-        ...     name = CharField(max_length=100)
-        ...     schemata = ManyToManyField(Schema)
-        ...
-        >>> class Item(BaseEntity):
-        ...     name = CharField(max_length=100)
-        ...     rubric = ForeignKey(Rubric)
-        ...     def filter_schemata(self, qs):
-        ...         return qs.filter(rubric_set=self.rubric)
-        ...
-        >>> fruits = Rubric(name='Fruits')
-        >>> fruits.schemata.create(name='colour', datatype='text')
-        <Schema 'colour'>
-        >>> fruits.schemata.create(name='taste', datatype='text')
-        <Schema 'taste'>
-        >>> apple = Item(name='Green Apple', rubric=fruits, colour='green')
-        >>> [x for x in apple]
-        ['name', rubric', 'colour', 'taste']
-        >>> 'colour' in apple
-        True
-        >>> apple.schema_names
-        ['colour', 'taste']
-        >>> apple.field_names
-        ['name', 'rubric']
-        >>> apple.name
-        'Green Apple'
-        >>> apple['name']
-        'Green Apple'
-        >>> apple.colour
-        >>> apple['colour']
-        'Green Apple'
-        >>> apple.get_schema('colour')
-        <Schema 'colour'>
+    Note: you *must* define schema_model attribute to make things work.
     """
 
     attrs = generic.GenericRelation('Attr', content_type_field='entity_content_type',
@@ -197,6 +167,7 @@ class BaseEntity(Model):
         abstract = True
 
     def save(self, **kwargs):
+        #print '%s.save(%s)' % (self._meta.object_name, kwargs)
         # save entity
         super(BaseEntity, self).save(**kwargs)
 
@@ -205,16 +176,30 @@ class BaseEntity(Model):
                     'entity_object_id': self.pk,}
 
         for name in self.schema_names:
+            value = getattr(self, name, None)
             schema = self.get_schema(name)
             #attr, _ = Attr.objects.get_or_create(schema=schema)#, content_object=obj)
             schema_defaults = {'schema_content_type': schema.attrs.content_type,
                                'schema_object_id': schema.pk,}
             lookups = dict(defaults, **schema_defaults)
-            attr, _ = Attr.objects.get_or_create(**lookups)
-            #f = attr._meta.get_field('value_%s' % schema.datatype)
-            #f.save_form_data(attr, self.get_attr_value(name))
-            attr.value = getattr(self, name, '')
-            attr.save()
+            # TODO: do not retrieve attrs from db, they should be already fetched
+            #       and sit in self._eav_attrs (but it seems to be updated only after save)
+            try:
+                attr = Attr.objects.get(**lookups)
+            except Attr.DoesNotExist:
+                if value:
+                    attr = Attr(**lookups)
+                    attr.value = value
+                    attr.save()
+            else:
+                if value != attr.value:
+                    attr.value = value
+                    attr.save()
+            #attr, _ = Attr.objects.get_or_create(**lookups)
+            ##f = attr._meta.get_field('value_%s' % schema.datatype)
+            ##f.save_form_data(attr, self.get_attr_value(name))
+            #attr.value = value
+            #attr.save()
 
     def __getattr__(self, name):
         if not name.startswith('_'):
@@ -260,11 +245,9 @@ class BaseEntity(Model):
     def _eav_attrs_dict(self):
         return dict((a.schema.name, a) for a in self._eav_attrs)
 
-    @property
-    def schema_model(cls):
-        return Schema
+    schema_model = NotImplemented
 
-    def filter_schemata(self):
+    def filter_schemata(self, qs):
         return qs
 
     #@cached_property
@@ -281,146 +264,6 @@ class BaseEntity(Model):
     def get_schema(self, name):
         return self._schemata_dict[name]
 
-    '''
-    @cached_property
-    def all_eav_attributes(self):
-        return self.attrs.select_related()
-
-    @cached_property
-    def all_attributes_dict(self):
-        """ Returns all existing attributes for this entity, regardless to whether
-        they confirm to the schemata applied by entity's rubric.
-        """
-        return dict((x.schema.name, x) for x in self.all_attributes)
-
-    @cached_property
-    def valid_attributes(self):
-        """ Returns existing attributes for this entity, filtered by the schemata
-        applied by entity's rubric.
-        """
-        # ignore attributes for which there's no schema
-        q = self._all_attributes.filter(schema__in=self.schemata.values())
-
-        # TODO ignore inactive attrs:
-        #print 'active', [x for x in q if x.removed]
-        #q = q.exclude(removed=True
-
-        return dict((x.schema.name, x) for x in q)
-
-
-    def get_lookups(self):
-        return {'rubric': self.rubric}
-
-    def get_schemata_for_instance(self):
-        schemata = Schema.objects.all()
-        return self.filter_schemata(schemata)
-
-    def filter_schemata_by_fields(self, qs):
-        return qs
-
-
-    @classmethod
-    def get_schemata(cls, **kwargs):
-        """
-        Returns schemata available for this entity class.
-        Instance attributes and their values can be passed as keyword arguments.
-        """
-        # you may want to overload this method in a custom Entity model
-        # and use kwargs to filter schemata by instance fields
-        return Schema.objects.all()
-
-    @classmethod
-    def get_schemata_dict(cls, **kwargs):
-        """
-        Returns a dictionary of existing schemata where keys are names of attributes
-        and values are schemata describing these names.
-
-        Instance attributes and their values can be passed as keyword arguments.
-        """
-        schemata = cls.get_schemata(**kwargs)
-        return dict((s.name,s) for s in schemata)
-
-    # names
-
-    @property
-    def field_names(self):
-        return self._meta.get_all_field_names()
-
-    @property
-    def schema_names(self):
-        return self.get_schemata()
-
-    @property
-    def all_names(self):
-        return self.field_names + self.schema_names
-
-    # metadata instances
-
-    def get_schemata(self):
-        qs = Schema.objects.all()
-        return self.filter_schemata(qs)
-
-    def filter_schemata(self, qs):
-        return qs
-
-
-    @classmethod
-    def get_nameslots(cls):
-        "Returns all possible attribute names for this model."
-        fields = cls._meta.get_all_field_names()
-        schemata = cls.get_schemata_dict()
-        return fields + schemata.keys()
-
-    @cached_property
-    def fields_and_eav(self):
-        "Returns all fields and EAV attributes for this instance."
-        # TODO: replace this method with .keys() or __iter__
-        fields = self._meta.get_all_field_names()
-        schemata = self.get_schemata_dict(self.rubric)
-        return fields + schemata.keys()
-
-    def value_for(self, name):
-        "Returns value of field or EAV attribute with given name."
-        # TODO: replace this method with __getattr__
-        if not name in self.fields_and_eav:
-            raise NameError('Unknown field or schema. Available: %s' %
-                            ', '.join(self.fields_and_eav))
-        if name in self._meta.get_all_field_names():
-            return getattr(self, name)
-        attr = self.attributes.get(name)
-        if attr:
-            return attr.value
-        return None
-
-    @cached_property
-    def _all_attributes(self):
-        return self.attrs.select_related()
-
-    @cached_property
-    def all_attributes(self):
-        """ Returns all existing attributes for this entity, regardless to whether
-        they confirm to the schemata applied by entity's rubric.
-        """
-        return dict((x.schema.name, x) for x in self._all_attributes)
-
-    @cached_property
-    def attributes(self):
-        """ Returns existing attributes for this entity, filtered by the schemata
-        applied by entity's rubric.
-        """
-        # ignore attributes for which there's no schema
-        q = self._all_attributes.filter(schema__in=self.schemata.values())
-
-        # TODO ignore inactive attrs:
-        #print 'active', [x for x in q if x.removed]
-        #q = q.exclude(removed=True
-
-        return dict((x.schema.name, x) for x in q)
-
-    @cached_property
-    def schemata(self):
-        return get_schemata_dict(self.rubric)
-    '''
     def is_valid(self):
         "Returns True if attributes and their values conform with schema."
 
@@ -476,6 +319,10 @@ class Attr(Model):
         setattr(self, 'value_%s' % self.schema.datatype, new_value)
 
     value = property(_get_value, _set_value)
+
+    #def save(self,**kw):
+    #    print '%s.save(%s) -- %s' % (self._meta.object_name, kw, self)
+    #    super(Attr, self).save(**kw)
 
 
 # xxx catch signal Attr.post_save() --> update attr.item.attribute_cache (JSONField or such)

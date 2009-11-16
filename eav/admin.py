@@ -8,10 +8,6 @@ from django.utils.safestring import mark_safe
 # 3rd-party
 from view_shortcuts.decorators import render_to
 
-# this app
-from models import Attr, Schema
-from forms import SchemaForm, BaseDynamicEntityForm
-
 
 class BaseEntityAdmin(ModelAdmin):
 
@@ -36,16 +32,7 @@ class BaseEntityAdmin(ModelAdmin):
         return super(BaseEntityAdmin, self).render_change_form(request, context, **kwargs)
 
 
-class SchemaAdmin(ModelAdmin):
-    form = SchemaForm
-    list_display = ('title', 'name', 'datatype', 'help_text',
-                    'required', 'filtered', 'sortable', 'rubrics')
+class BaseSchemaAdmin(ModelAdmin):
+
+    list_display = ('title', 'name', 'datatype', 'help_text', 'required')
     prepopulated_fields = {'name': ('title',)}
-
-    def rubrics(self, instance):
-        return ', '.join([u'<a href="%s">%s</a>' % (x.get_absolute_url(), x.title)
-                          for x in instance.rubrics.all()])
-    rubrics.allow_tags = True
-
-
-site.register(Schema, SchemaAdmin)

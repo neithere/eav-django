@@ -10,16 +10,14 @@ from django.contrib.admin.widgets import AdminDateWidget
 from django.utils.translation import ugettext_lazy as _
 
 # this app
-from models import Attr, Schema, BaseEntity
+from models import Attr, BaseEntity
 #from widgets import PlainTextWidget
 
 
-__all__ = ['SchemaForm', 'BaseDynamicEntityForm']
+__all__ = ['BaseSchemaForm', 'BaseDynamicEntityForm']
 
 
-class SchemaForm(ModelForm):
-    class Meta:
-        model = Schema
+class BaseSchemaForm(ModelForm):
 
     def clean_name(self):
         "Avoid name clashes between static and dynamic attributes."
@@ -72,9 +70,6 @@ class BaseDynamicEntityForm(ModelForm):
         if self.instance:
             return True
 
-    def get_schemata(self):
-        self.instance.schemata if self.instance else []
-
     def _build_dynamic_fields(self):
         # reset form fields
         self.fields = deepcopy(self.base_fields)
@@ -83,9 +78,10 @@ class BaseDynamicEntityForm(ModelForm):
         if not self.check_eav_allowed():
             return
 
-        schemata = self.get_schemata()
+        names = self.instance.schema_names
 
-        for schema in schemata:
+        for name in names:
+            schema = self.instance.get_schema(name)
             defaults = {
                 'label':     schema.title.capitalize(),
                 'required':  schema.required,
@@ -104,20 +100,17 @@ class BaseDynamicEntityForm(ModelForm):
 
     def save(self, commit=True):
         """
-        Saves this ``form``'s cleaned_data into model instance
-        ``self.instance`` and related EAV attributes.
-
-        Please note that the changes to ``instance`` and EAV attributes are
-        *always* saved to the database, i.e. `commit` value is ignored.
+        Saves this ``form``'s cleaned_data into model instance ``self.instance``
+        and related EAV attributes.
 
         Returns ``instance``.
         """
 
         if self.errors:
             raise ValueError("The %s could not be saved because the data didn't"
-                            " validate." % self.instance._meta.object_name)
+                             " validate." % self.instance._meta.object_name)
 
-        # create entity instance
+        # create entity instance, don't save yet
         instance = super(BaseDynamicEntityForm, self).save(commit=False)
 
         # assign attributes
@@ -126,7 +119,8 @@ class BaseDynamicEntityForm(ModelForm):
             setattr(instance, name, value)
 
         # save entity and its attributes
-        instance.save()      # save again, this time with attrs   TODO can we create instance and save it only now?
+        if commit:
+            instance.save()
 
         return instance
     save.alters_data = True
