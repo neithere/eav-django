@@ -211,8 +211,8 @@ class BaseEntity(Model):
         raise AttributeError('%s does not have attribute named "%s".' % (self._meta.object_name, name))
 
     def __iter__(self):
-        "Iterates over EAV attributes. Normal fields are not included."           # xxx do we use this anywhere?
-        return iter(self._eav_attrs)
+        "Iterates over non-empty EAV attributes. Normal fields are not included."
+        return iter([a for a in self._eav_attrs if getattr(self, a.schema.name, None)])
 
     # names
 

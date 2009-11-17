@@ -42,6 +42,10 @@ class MyEntity(BaseEntity):
     schema_model = MySchema
     title = models.CharField(max_length=100)
 
+    @classmethod
+    def get_schemata_for_model(cls):
+        return MySchema.objects.all()
+
     def __unicode__(self):
         return self.title
 
