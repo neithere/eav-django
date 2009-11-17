@@ -7,11 +7,11 @@ from django.db import models
 from models import Attr, BaseEntity, BaseSchema
 
 __doc__ = """
->>> Schema.objects.create(name='colour', datatype='text', title='Colour')
-<Schema: Colour (text) >
->>> Schema.objects.create(name='taste', datatype='text', title='Taste')
-<Schema: Taste (text) >
->>> e = Entity.objects.create(title='apple', colour='green')
+>>> MySchema.objects.create(name='colour', datatype='text', title='Colour')
+<MySchema: Colour (text) >
+>>> MySchema.objects.create(name='taste', datatype='text', title='Taste')
+<MySchema: Taste (text) >
+>>> e = MyEntity.objects.create(title='apple', colour='green')
 >>> e.title
 'apple'
 >>> e.colour
@@ -25,21 +25,21 @@ __doc__ = """
 >>> e.save()
 >>> e.attrs.all()
 [<Attr: apple: Colour "yellow">, <Attr: apple: Taste "sweet">]
->>> Entity.objects.by_attributes(title='apple')
-[<Entity: apple>]
->>> Entity.objects.by_attributes(colour='yellow')
-[<Entity: apple>]
->>> Entity.objects.by_attributes(colour='yellow', title='apple')
-[<Entity: apple>]
+>>> MyEntity.objects.by_attributes(title='apple')
+[<MyEntity: apple>]
+>>> MyEntity.objects.by_attributes(colour='yellow')
+[<MyEntity: apple>]
+>>> MyEntity.objects.by_attributes(colour='yellow', title='apple')
+[<MyEntity: apple>]
 """
 
 
-class Schema(BaseSchema):
+class MySchema(BaseSchema):
     pass
 
 
-class Entity(BaseEntity):
-    schema_model = Schema
+class MyEntity(BaseEntity):
+    schema_model = MySchema
     title = models.CharField(max_length=100)
 
     def __unicode__(self):
@@ -49,9 +49,9 @@ class Entity(BaseEntity):
 
 '''     >>> class Rubric(Model):
         ...     name = CharField(max_length=100)
-        ...     schemata = ManyToManyField(Schema)
+        ...     schemata = ManyToManyField(MySchema)
         ...
-        >>> class Item(BaseEntity):
+        >>> class Item(BaseMyEntity):
         ...     name = CharField(max_length=100)
         ...     rubric = ForeignKey(Rubric)
         ...     def filter_schemata(self, qs):
@@ -59,9 +59,9 @@ class Entity(BaseEntity):
         ...
         >>> fruits = Rubric(name='Fruits')
         >>> fruits.schemata.create(name='colour', datatype='text')
-        <Schema 'colour'>
+        <MySchema 'colour'>
         >>> fruits.schemata.create(name='taste', datatype='text')
-        <Schema 'taste'>
+        <MySchema 'taste'>
         >>> apple = Item(name='Green Apple', rubric=fruits, colour='green')
         >>> [x for x in apple]
         ['name', rubric', 'colour', 'taste']
@@ -79,5 +79,5 @@ class Entity(BaseEntity):
         >>> apple['colour']
         'Green Apple'
         >>> apple.get_schema('colour')
-        <Schema 'colour'>
+        <MySchema 'colour'>
 '''

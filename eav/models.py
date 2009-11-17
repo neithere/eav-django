@@ -112,7 +112,7 @@ class EntityManager(Manager):
         #print '%s.create(%s)' % (self.model._meta.object_name, kwargs)
 
         fields = self.model._meta.get_all_field_names()
-        schemata = dict((s.name, s) for s in self.model.schema_model.objects.all())
+        schemata = dict((s.name, s) for s in self.model.get_schemata_for_model())
 
         # check if all attributes are known
         possible_names = set(fields) | set(schemata.keys())
@@ -166,7 +166,12 @@ class BaseEntity(Model):
     class Meta:
         abstract = True
 
-    def save(self, **kwargs):
+    def save(self, eav=True, **kwargs):
+        """
+        Saves entity instance and creates/updates related attribute instances.
+
+        :param eav: if True (default), EAV attributes are saved along with entity.
+        """
         #print '%s.save(%s)' % (self._meta.object_name, kwargs)
         # save entity
         super(BaseEntity, self).save(**kwargs)
@@ -187,19 +192,16 @@ class BaseEntity(Model):
             try:
                 attr = Attr.objects.get(**lookups)
             except Attr.DoesNotExist:
+                # only create attribute if it's not None
                 if value:
                     attr = Attr(**lookups)
                     attr.value = value
                     attr.save()
             else:
+                # update attribute; keep it even if resetting value to None
                 if value != attr.value:
                     attr.value = value
                     attr.save()
-            #attr, _ = Attr.objects.get_or_create(**lookups)
-            ##f = attr._meta.get_field('value_%s' % schema.datatype)
-            ##f.save_form_data(attr, self.get_attr_value(name))
-            #attr.value = value
-            #attr.save()
 
     def __getattr__(self, name):
         if not name.startswith('_'):
@@ -234,8 +236,9 @@ class BaseEntity(Model):
     #@cached_property
     @property
     def _eav_attrs(self):
+        schema_model = self.get_schemata_for_model().model
         defaults = {
-            'schema_content_type': Attr.schema.get_content_type(self.schema_model),
+            'schema_content_type': Attr.schema.get_content_type(schema_model),
             'schema_object_id__in': self._schemata,
         }
         return self.attrs.filter(**defaults).select_related()
@@ -245,16 +248,20 @@ class BaseEntity(Model):
     def _eav_attrs_dict(self):
         return dict((a.schema.name, a) for a in self._eav_attrs)
 
-    schema_model = NotImplemented
+    @classmethod
+    def get_schemata_for_model(cls):
+        return NotImplementedError('BaseEntity subclasses must define method '
+                                   '"get_schemata_for_model" which returns a '
+                                   'QuerySet for a BaseSchema subclass.')
 
-    def filter_schemata(self, qs):
+    def get_schemata_for_instance(self, qs):
         return qs
 
     #@cached_property
     @property
     def _schemata(self):
-        qs = self.schema_model.objects.select_related()
-        return self.filter_schemata(qs)
+        qs = self.get_schemata_for_model().select_related()
+        return self.get_schemata_for_instance(qs)
 
     #@cached_property
     @property
@@ -319,10 +326,6 @@ class Attr(Model):
         setattr(self, 'value_%s' % self.schema.datatype, new_value)
 
     value = property(_get_value, _set_value)
-
-    #def save(self,**kw):
-    #    print '%s.save(%s) -- %s' % (self._meta.object_name, kw, self)
-    #    super(Attr, self).save(**kw)
 
 
 # xxx catch signal Attr.post_save() --> update attr.item.attribute_cache (JSONField or such)
