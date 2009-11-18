@@ -36,18 +36,21 @@ __doc__ = """
 
 >>> size = MySchema.objects.create(name='size', title='Size', datatype='text', m2o=True)
 >>> e = MyEntity(title='T-shirt')
->>> e.size = 'wrong value'
+>>> e.size = 's'
 >>> e.save()
-Traceback (most recent call last):
-    ...
-ValueError: Cannot save T-shirt.size: expected list or None, got "wrong value"
->>> e.size = ['wrong choice']
->>> e.save()
+>>> e2 = MyEntity.objects.get(pk=e.pk)
+>>> e2.size
+['s']
+>>> e2.size = ['wrong choice']
+>>> e2.save()
 Traceback (most recent call last):
     ...
 ValueError: Cannot save T-shirt.size: expected subset of ['s', 'm', 'l'], got "['wrong choice']"
->>> e.size = ['s', 'l']
->>> e.save()
+>>> e2.size = ['s', 'l']
+>>> e2.save()
+>>> e3 = MyEntity.objects.get(pk=e.pk)
+>>> e3.size
+['s', 'l']
 >>> MySchema.objects.filter(managed=False)
 [<MySchema: Colour (text) >, <MySchema: Size (text) >, <MySchema: Taste (text) >]
 >>> MySchema.objects.filter(managed=True)

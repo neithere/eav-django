@@ -128,7 +128,7 @@ class BaseSchema(Model):
 
         If schema is many-to-one, the value is processed thusly:
 
-        * if value is list, all Attr instances for corresponding managed m2o
+        * if value is iterable, all Attr instances for corresponding managed m2o
           schemata are updated (those with names from the value list are set to
           True, others to False). If a list item is not in available choices,
           ValueError is raised;
@@ -140,94 +140,71 @@ class BaseSchema(Model):
         if __debug__: print u'%s.save_attr(entity=%s, name="%s", value="%s")' % (self, entity, name, value)
 
         if self.m2o:
-            # schema is many-to-one
-
-            if __debug__: print '  m2o'
-
-            valid_choices = [get_m2o_schema_name(name, c) for c,t in self.get_choices()]
-
-            if __debug__: print '  valid_choices', valid_choices
-
-            if isinstance(value, list):     # xxx maybe hasattr('__iter__') ?
-                if __debug__: print '  value is list'
-
-                enabled_choices = [get_m2o_schema_name(name, v) for v in value]
-
-                if __debug__: print '    enabled choices:', enabled_choices
-
-                # If a list item is not in available choices, ValueError is raised
-                if not set(enabled_choices).issubset(valid_choices):
-                    raise ValueError(u'Cannot save %s.%s: expected subset of %s, '
-                                     'got "%s"'.encode('utf8') % (entity, name,
-                                     [x[0] for x in self.get_choices()], value))
-
-                # Attr instances for corresponding managed m2o schemata are updated
-
-                for choice, title in self.get_choices():
-                    if __debug__: print '      choice', choice
-                    schema_name = get_m2o_schema_name(name, choice)
-                    managed_schema = type(self).objects.get(name=schema_name)
-                    lookups = {
-                        # entity
-                        'entity_content_type': entity.attrs.content_type,
-                        'entity_object_id': entity.pk,
-                        ## schema
-                        #'schema__name': choice,    # e.g. 'm2o_color_blue'
-                        # schema
-                        'schema_content_type': self.attrs.content_type,
-                        'schema_object_id': managed_schema.pk,
-                    }
-                    if __debug__: print '      lookups:', lookups
-                    try:
-                        attr = Attr.objects.get(**lookups)
-                        if __debug__: print '      attr found, updating'
-                    except Attr.DoesNotExist:
-                        # only create attribute if it's not None
-                        if __debug__: print '      attr not found, creating'
-                        attr = Attr(**lookups)
-                    attr.title = title
-                    attr.value = True if schema_name in enabled_choices else False
-                    if __debug__: print 'schema_name is', ('in' if attr.value else 'not in'), 'enabled_choices'
-                    attr.save()
-
-            elif value is None:
-                # if the value is None, all corresponding Attr instances are reset to False
-                if __debug__: print '  value is None, resetting all Attr\'s'
-                Attr.objects.filter(schema__name__in=valid_choices).update(value_bool=False)
-            else:
-                # if the value is neither a list nor None, ValueError is raised.
-                if __debug__: print '  value is wrong:)'
-                raise ValueError('Cannot save %s.%s: expected list or None, got "%s"'
-                                % (entity, name, value))
+            self._save_m2o_attr(entity, name, value)
         else:
-            # If schema is not many-to-one, the value is saved to the corresponding
-            # Attr instance (which is created or updated).
-            if __debug__: print '  not m2o'
-            lookups = {
-                # entity
-                'entity_content_type': entity.attrs.content_type,
-                'entity_object_id': entity.pk,
-                # schema
-                'schema_content_type': self.attrs.content_type,
-                'schema_object_id': self.pk,
-            }
-            if __debug__: print '    lookups:', lookups
-            try:
-                attr = Attr.objects.get(**lookups)
-            except Attr.DoesNotExist:
-                # only create attribute if it's not None
-                if __debug__: print '    attr not found'
-                if value:
-                    if __debug__: print '      value is not None, creating'
-                    attr = Attr(**lookups)
-                    attr.value = value
-                    attr.save()
-            else:
-                # update attribute; keep it even if resetting value to None
-                if __debug__: print '    attr found, updating'
-                if value != attr.value:
-                    attr.value = value
-                    attr.save()
+            self._save_single_attr(entity, name, value)
+
+    def _save_single_attr(self, entity, name, value, schema=None,
+                          create_nulls=False, extra={}):
+        """
+        Creates or updates an EAV attribute for given entity with given value.
+
+        :param schema: schema for attribute. Default it current schema instance.
+        :param create_nulls: boolean: if True, even attributes with value=None
+            are created (be default they are skipped).
+        :param extra: dict: additional data for Attr instance (e.g. title).
+        """
+        # If schema is not many-to-one, the value is saved to the corresponding
+        # Attr instance (which is created or updated).
+        schema = schema or self
+        lookups = {
+            # entity
+            'entity_content_type': entity.attrs.content_type,
+            'entity_object_id': entity.pk,
+            # schema
+            'schema_content_type': schema.attrs.content_type,
+            'schema_object_id': schema.pk,
+        }
+        try:
+            attr = Attr.objects.get(**lookups)
+        except Attr.DoesNotExist:
+            attr = Attr(**lookups)
+        if create_nulls or value != attr.value:
+            attr.value = value
+            for k,v in extra.items():
+                setattr(attr, k, v)
+            attr.save()
+
+    def _save_m2o_attr(self, entity, name, value):
+        # schema is many-to-one
+
+        valid_choices = [get_m2o_schema_name(name, c) for c,t in self.get_choices()]
+
+        if value is None:
+            # reset related Attr instances to False
+            Attr.objects.filter(schema__name__in=valid_choices).update(value_bool=False)
+            return
+
+        if not hasattr(value, '__iter__'):
+            value = [value]
+
+        enabled_choices = [get_m2o_schema_name(name, v) for v in value]
+
+        # If a list item is not in available choices, ValueError is raised
+        if not set(enabled_choices).issubset(valid_choices):
+            raise ValueError(u'Cannot save %s.%s: expected subset of %s, '
+                                'got "%s"'.encode('utf8') % (entity, name,
+                                [x[0] for x in self.get_choices()], value))
+
+        # Attr instances for corresponding managed m2o schemata are updated
+        for choice, title in self.get_choices():
+            schema_name = get_m2o_schema_name(name, choice)
+            self._save_single_attr(entity, name,
+                value = True if schema_name in enabled_choices else False,
+                schema = type(self).objects.get(name=schema_name),
+                create_nulls = True,
+                extra = {'title': title}
+            )
 
 
 class EntityManager(Manager):
@@ -422,8 +399,21 @@ class BaseEntity(Model):
 
     def __getattr__(self, name):
         if not name.startswith('_'):
+            if __debug__: print '%s.%s -- %s' % (type(self), name, self._schemata_dict)
             if name in self._schemata_dict:
+                schema = self._schemata_dict[name]
+                if schema.m2o:
+                    value_list = []
+                    choices = [x[0] for x in schema.get_choices()]
+                    for choice in choices:
+                        n = get_m2o_schema_name(name, choice)
+                        if __debug__: print name,n
+                        attr = self._eav_attrs_dict.get(n)
+                        if attr and attr.value:
+                            value_list.append(choice)
+                    return value_list
                 attr = self._eav_attrs_dict.get(name)
+                if __debug__: print attr
                 return attr.value if attr else None
         raise AttributeError('%s does not have attribute named "%s".' % (self._meta.object_name, name))
 
