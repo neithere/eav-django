@@ -25,17 +25,47 @@ __doc__ = """
 >>> e.save()
 >>> e.attrs.all()
 [<Attr: apple: Colour "yellow">, <Attr: apple: Taste "sweet">]
->>> MyEntity.objects.by_attributes(title='apple')
+>>> MyEntity.objects.filter(title='apple')
 [<MyEntity: apple>]
->>> MyEntity.objects.by_attributes(colour='yellow')
+>>> MyEntity.objects.filter(colour='yellow')
 [<MyEntity: apple>]
->>> MyEntity.objects.by_attributes(colour='yellow', title='apple')
+>>> MyEntity.objects.filter(colour='yellow', title='apple')
 [<MyEntity: apple>]
+
+### many-to-one
+
+>>> size = MySchema.objects.create(name='size', title='Size', datatype='text', m2o=True)
+>>> e = MyEntity(title='T-shirt')
+>>> e.size = 'wrong value'
+>>> e.save()
+Traceback (most recent call last):
+    ...
+ValueError: Cannot save T-shirt.size: expected list or None, got "wrong value"
+>>> e.size = ['wrong choice']
+>>> e.save()
+Traceback (most recent call last):
+    ...
+ValueError: Cannot save T-shirt.size: expected subset of ['s', 'm', 'l'], got "['wrong choice']"
+>>> e.size = ['s', 'l']
+>>> e.save()
+>>> MySchema.objects.filter(managed=False)
+[<MySchema: Colour (text) >, <MySchema: Size (text) >, <MySchema: Taste (text) >]
+>>> MySchema.objects.filter(managed=True)
+[<MySchema: Large (boolean) >, <MySchema: Medium (boolean) >, <MySchema: Small (boolean) >]
+>>> Attr.objects.all()
+[<Attr: apple: Colour "yellow">, <Attr: apple: Taste "sweet">, <Attr: T-shirt: Small "True">, \
+<Attr: T-shirt: Medium "False">, <Attr: T-shirt: Large "True">]
 """
 
 
 class MySchema(BaseSchema):
-    pass
+    def get_choices(self):
+        # testingly hardcoded choices for a "size" schema
+        return [
+            ('s', 'Small'),
+            ('m', 'Medium'),
+            ('l', 'Large'),
+        ]
 
 
 class MyEntity(BaseEntity):
