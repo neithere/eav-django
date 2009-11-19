@@ -45,7 +45,7 @@ __doc__ = """
 >>> e2.save()
 Traceback (most recent call last):
     ...
-ValueError: Cannot save T-shirt.size: expected subset of ['s', 'm', 'l'], got "['wrong choice']"
+ValueError: Cannot save eav.tests.MyEntity.size: expected subset of ['s', 'm', 'l'], got "['wrong choice']"
 >>> e2.size = ['s', 'l']
 >>> e2.save()
 >>> e3 = MyEntity.objects.get(pk=e.pk)
@@ -58,11 +58,18 @@ ValueError: Cannot save T-shirt.size: expected subset of ['s', 'm', 'l'], got "[
 >>> Attr.objects.all()
 [<Attr: apple: Colour "yellow">, <Attr: apple: Taste "sweet">, <Attr: T-shirt: Small "True">, \
 <Attr: T-shirt: Medium "False">, <Attr: T-shirt: Large "True">]
+
 """
 
 
 class MySchema(BaseSchema):
-    def get_choices(self):
+    def save(self, **kw):
+        instance = super(MySchema, self).save(**kw)
+        choices = self.get_choices()
+        self.save_m2o(choices)
+        return instance
+
+    def get_choices(self, entity=None):
         # testingly hardcoded choices for a "size" schema
         return [
             ('s', 'Small'),

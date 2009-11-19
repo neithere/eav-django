@@ -16,9 +16,11 @@ from autoslug.fields import AutoSlugField
 from autoslug.settings import slugify
 from view_shortcuts.decorators import cached_property
 
+# this app
+from managers import EntityManager
 
-__all__ = ['Attr', 'BaseEntity', 'BaseSchema', 'MANAGED_MANY_TO_ONE_PREFIX',
-           'EntityManager']
+
+__all__ = ['Attr', 'BaseEntity', 'BaseSchema', 'MANAGED_MANY_TO_ONE_PREFIX']
 
 
 MANAGED_MANY_TO_ONE_PREFIX = 'm2o'
@@ -26,7 +28,7 @@ MANAGED_MANY_TO_ONE_PREFIX = 'm2o'
 
 def get_m2o_schema_name(name, value):
     """
-    Returns manages many-to-one schema name for given "naive" name and value
+    Returns managed many-to-one schema name for given "naive" name and value
     with respect to `MANAGED_MANY_TO_ONE_PREFIX`::
 
         get_m2o_schema_name('color', 'green')    # --> 'm2o_color_green'
@@ -51,10 +53,6 @@ class BaseSchema(Model):
     help_text = CharField(_('help text'), max_length=250, blank=True,
                           help_text=_('short description for administrator'))
     datatype = CharField(_('data type'), max_length=4, choices=DATATYPE_CHOICES)
-    required = BooleanField(_('required'))
-    searched = BooleanField(_('include in search'))  # i.e. full-text search? mb for text only
-    filtered = BooleanField(_('include in filters'))
-    sortable = BooleanField(_('allow sorting'))
 
     # TODO: these flags are mutually exclusive; make one? or three choices? or move smth to "through" model?
     #
@@ -63,7 +61,12 @@ class BaseSchema(Model):
     managed = BooleanField(editable=False)
     # if True, this schema is not used in lookups and only present in forms;
     # it displays ...............................?
-    m2o = BooleanField(editable=False)
+    m2o = BooleanField(verbose_name=_('multiple choices'))
+
+    required = BooleanField(_('required'))
+    searched = BooleanField(_('include in search'))  # i.e. full-text search? mb for text only
+    filtered = BooleanField(_('include in filters'))
+    sortable = BooleanField(_('allow sorting'))
 
     attrs = generic.GenericRelation('Attr', content_type_field='schema_content_type',
                                     object_id_field='schema_object_id')    # XXX do we need this?
@@ -77,7 +80,7 @@ class BaseSchema(Model):
         return u'%s (%s) %s' % (self.title, self.get_datatype_display(),
                                 _('required') if self.required else '')
 
-    def get_choices(self):
+    def get_choices(self, entity):
         """
         Returns a list of name/title tuples::
 
@@ -96,28 +99,39 @@ class BaseSchema(Model):
         raise NotImplementedError('%s must overload get_choices() to enable '
                                   'many-to-one schemata.' % type(self))
 
-    def save(self, **kwargs):
-        instance = super(BaseSchema, self).save(**kwargs)
-        if self.m2o:
-            # create managed schemata
-            for choice, title in self.get_choices():
-                name = get_m2o_schema_name(self.name, choice)
-                if __debug__: print 'choice', choice, 'title', title, '-->', name
-                try:
-                    ms = type(self).objects.get(name=name)
-                except type(self).DoesNotExist:
-                    if __debug__: print '  creating managed schema...'
-                    ms = type(self).objects.create(
-                        name = name,
-                        title = title,
-                        datatype = 'bool',
-                        managed = True,
-                    )
-                else:
-                    if ms.title != title:
-                        ms.title = title
-                        ms.save()
-        return instance
+
+    def save_m2o(self, choices):
+        """
+        Creates/updates related many-to-one managed schemata.
+        (By the way, these "managed" schemata are managed by this very method.)
+
+        Please not that this method is *not* called on save, you must do that
+        manually (e.g. catch post_save signal or overload BaseSchema.save and
+        call it from there). See get_choices for the reasoning.
+
+        This method does not remove managed schemata that are not more in use
+        because there may be attributes attached.
+
+        TODO: There should be a command to explicitly wipe all unused instances.
+        """
+        if not self.m2o:
+            return
+        # create managed schemata
+        for choice, title in choices:
+            name = get_m2o_schema_name(self.name, choice)
+            try:
+                ms = type(self).objects.get(name=name)
+            except type(self).DoesNotExist:
+                ms = type(self).objects.create(
+                    name = name,
+                    title = title,
+                    datatype = 'bool',
+                    managed = True,
+                )
+            else:
+                if ms.title != title:
+                    ms.title = title
+                    ms.save()
 
     def save_attr(self, entity, name, value):
         """
@@ -137,8 +151,6 @@ class BaseSchema(Model):
           processed as above (i.e. "foo" --> ["foo"]).
         """
 
-        if __debug__: print u'%s.save_attr(entity=%s, name="%s", value="%s")' % (self, entity, name, value)
-
         if self.m2o:
             self._save_m2o_attr(entity, name, value)
         else:
@@ -156,6 +168,9 @@ class BaseSchema(Model):
         """
         # If schema is not many-to-one, the value is saved to the corresponding
         # Attr instance (which is created or updated).
+
+        print 'saving single attribute "%s" = "%s" in ' % (name, value), entity
+
         schema = schema or self
         lookups = {
             # entity
@@ -178,7 +193,9 @@ class BaseSchema(Model):
     def _save_m2o_attr(self, entity, name, value):
         # schema is many-to-one
 
-        valid_choices = [get_m2o_schema_name(name, c) for c,t in self.get_choices()]
+        print 'saving m2o attribute', name, '=', value, 'in', entity
+
+        valid_choices = [get_m2o_schema_name(name, c) for c,t in self.get_choices(entity)]
 
         if value is None:
             # reset related Attr instances to False
@@ -192,176 +209,21 @@ class BaseSchema(Model):
 
         # If a list item is not in available choices, ValueError is raised
         if not set(enabled_choices).issubset(valid_choices):
-            raise ValueError(u'Cannot save %s.%s: expected subset of %s, '
-                                'got "%s"'.encode('utf8') % (entity, name,
-                                [x[0] for x in self.get_choices()], value))
+            raise ValueError(u'Cannot save %s.%s.%s: expected subset of %s, '
+                                'got "%s"'.encode('utf8') % (type(entity).__module__,
+                                type(entity).__name__, name,
+                                [x[0] for x in self.get_choices(entity)], value))
 
         # Attr instances for corresponding managed m2o schemata are updated
-        for choice, title in self.get_choices():
+        for choice, title in self.get_choices(entity):
             schema_name = get_m2o_schema_name(name, choice)
-            self._save_single_attr(entity, name,
+            self._save_single_attr(entity, schema_name,
                 value = True if schema_name in enabled_choices else False,
                 schema = type(self).objects.get(name=schema_name),
                 create_nulls = True,
                 extra = {'title': title}
             )
 
-
-class EntityManager(Manager):
-
-    def _filter_by_schema_straight(self, qs, lookup, sublookup, value, schema):
-        if __debug__: print '  ordinary schema'
-        # using normal schema.
-        # filter entities by attribute which is linked to given schema
-        # and has given value in the field for schema's datatype.
-        value_lookup = 'attrs__value_%s' % schema.datatype
-        if sublookup:
-            value_lookup = '%s__%s' % (value_lookup, sublookup)
-        lookups = {
-            # schema
-            'attrs__schema_content_type': schema.attrs.content_type,
-            'attrs__schema_object_id': schema.pk,
-            # value
-            str(value_lookup): value,
-        }
-        if __debug__: print '    lookups:', lookups
-        return qs.filter(**lookups)
-
-    def _filter_by_schema_m2o(self, qs, lookup, value, schema):
-        if __debug__: print '  many-to-one management schema'
-        # using many-to-one schema. Actually it is:
-        # a) "management schema" (one) which can contain a list
-        #     of choices (defined by get_choices), its value doesn't matter;
-        # b) "managed schema" (many) which names are like "m2o_color_blue"
-        #     where "color" is management schema's name, and "blue"
-        #     is one of choices. Datatype in bool.
-        # So, if we've got color="blue", we do the following:
-        #
-
-        #choices = schema.get_choice_names()    # ['green', 'red', 'blue']
-        schema_model = self.model.get_schemata_for_model().model
-        managed_name = get_m2o_schema_name(schema.name, value)
-        try:
-            managed_schema = schema_model.objects.get(name=managed_name)
-        except schema_model.DoesNotExist:
-            # TODO: smarter error message, i.e. how could this happen and what to do
-            raise ValueError(u'Could not find managed m2o schema %s for name "%s" '
-                              'and value "%s"'.encode('utf8') % (managed_name, schema.name, value))
-        #subschemata = Schema.objects.filter(name__in=['m2o_%s_%s' % (schema.name, choice) for choice in choices])
-        #for subschema in subschemata:
-        lookups = {
-            # schema
-            'attrs__schema_content_type': managed_schema.attrs.content_type,
-            'attrs__schema_object_id': managed_schema.pk,
-            # value
-            'attrs__value_bool': True,
-        }
-        if __debug__: print '    lookups:', lookups
-        return qs.filter(**lookups)
-
-    def _filter_by_lookup(self, qs, lookup, value):
-        fields   = self.model._meta.get_all_field_names()
-        schemata = dict((s.name, s) for s in self.model.get_schemata_for_model())
-
-        if '__' in lookup:
-            name, sublookup = lookup.split('__')
-        else:
-            name, sublookup = lookup, None
-
-        if name in fields:
-            # ordinary model field
-            if __debug__: print name, 'is a field'
-            return qs.filter(**{lookup: value})
-        elif name in schemata:
-            # EAV attribute (Attr instance linked to entity)
-            if __debug__: print name, 'is an EAV attribute'
-            schema = schemata.get(name)
-            if schema.m2o:
-                if sublookup:
-                    raise NameError('%s is not a valid lookup: sublookups cannot '
-                                    'be used with m2o attributes.' % lookup)
-                return self._filter_by_schema_m2o(qs, lookup, value, schema)
-            else:
-                return self._filter_by_schema_straight(qs, lookup, sublookup, value, schema)
-        else:
-            raise NameError('Cannot filter items by attributes: unknown '
-                            'attribute "%s". Available fields: %s. '
-                            'Available schemata: %s.' % (name,
-                            ', '.join(fields), ', '.join(schemata)))
-
-    def filter(self, **kw):
-        """
-        A wrapper around standard filter() method. Allows to construct queries
-        involving both normal fields and EAV attributes without thinking about
-        implementation details. Usage::
-
-            ConcreteEntity.objects.by_attributes(rubric=1, price=2, colour='green')
-
-        ...where `rubric` is a ForeignKey field, and `colour` is the name of an
-        EAV attribute represented by Schema and Attr models.
-        """
-        #print '%s.by_attributes(%s)' % (self.model._meta.object_name, kwargs)
-
-        qs = self.all()
-        for lookup, value in kw.items():
-
-            # FIXME FIXME managed sche,a doesn't get "m2o" flag!!!
-
-            qs = self._filter_by_lookup(qs, lookup, value)
-        return qs
-
-
-    def create(self, **kwargs):
-        """
-        Creates entity instance and related Attr instances.
-
-        Note that while entity instances may filter schemata by fields, that
-        filtering does not take place here. Attribute of any schema will be saved
-        successfully as long as such schema exists.
-
-        Note that we cannot create attribute with no pre-defined schema because
-        we must know attribute type in order to properly put value into the DB.
-        """
-        #print '%s.create(%s)' % (self.model._meta.object_name, kwargs)
-
-        fields = self.model._meta.get_all_field_names()
-        schemata = dict((s.name, s) for s in self.model.get_schemata_for_model())
-
-        # check if all attributes are known
-        possible_names = set(fields) | set(schemata.keys())
-        wrong_names = set(kwargs.keys()) - possible_names
-        if wrong_names:
-            raise NameError('Cannot create %s: unknown attribute(s) "%s". '
-                            'Available fields: (%s). Available schemata: (%s).'
-                            % (self.model._meta.object_name, '", "'.join(wrong_names),
-                               ', '.join(fields), ', '.join(schemata)))
-
-        # init entity with fields
-        instance = self.model(**dict((k,v) for k,v in kwargs.items() if k in fields))
-
-        # set attributes; instance will check schemata on save
-        for name, value in kwargs.items():
-            setattr(instance, name, value)
-
-        # save instance and EAV attributes
-        instance.save(force_insert=True)
-
-        return instance
-
-'''
-class AttrDescriptor(object):
-    def __init__(self, name):
-        self.name = name
-
-    def __get__(self, instance):
-
-
-    def __set__(self, instance, value)
-
-
-    def save(self):
-        self.instance.save()
-'''
 
 class BaseEntity(Model):
     """
@@ -385,35 +247,34 @@ class BaseEntity(Model):
 
         :param eav: if True (default), EAV attributes are saved along with entity.
         """
-        #print '%s.save(%s)' % (self._meta.object_name, kwargs)
         # save entity
         super(BaseEntity, self).save(**kwargs)
+
+        if not self.check_eav_allowed():
+            return
 
         # create/update EAV attributes
         for name in self.schema_names:
             value = getattr(self, name, None)
             schema = self.get_schema(name)
-            #attr, _ = Attr.objects.get_or_create(schema=schema)#, content_object=obj)
             if not schema.managed:
                 schema.save_attr(self, name, value)
 
     def __getattr__(self, name):
         if not name.startswith('_'):
-            if __debug__: print '%s.%s -- %s' % (type(self), name, self._schemata_dict)
             if name in self._schemata_dict:
                 schema = self._schemata_dict[name]
                 if schema.m2o:
+                    # make a list of "real" m2o attributes under the single name
                     value_list = []
-                    choices = [x[0] for x in schema.get_choices()]
+                    choices = [x[0] for x in schema.get_choices(self)]
                     for choice in choices:
                         n = get_m2o_schema_name(name, choice)
-                        if __debug__: print name,n
                         attr = self._eav_attrs_dict.get(n)
                         if attr and attr.value:
                             value_list.append(choice)
                     return value_list
                 attr = self._eav_attrs_dict.get(name)
-                if __debug__: print attr
                 return attr.value if attr else None
         raise AttributeError('%s does not have attribute named "%s".' % (self._meta.object_name, name))
 
@@ -477,6 +338,16 @@ class BaseEntity(Model):
 
     def get_schema(self, name):
         return self._schemata_dict[name]
+
+    def check_eav_allowed(self):
+        """
+        Returns True if entity instance allows EAV attributes to be attached.
+
+        Can be useful if some external data is required to determine available
+        schemata and that data may be missing. In such cases this method should
+        be overloaded to check whether the data is available.
+        """
+        return True
 
     def is_valid(self):
         "Returns True if attributes and their values conform with schema."

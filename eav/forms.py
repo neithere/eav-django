@@ -5,8 +5,8 @@ from copy import deepcopy
 
 # django
 from django.forms import (BooleanField, CharField, DateField, IntegerField,
-                          ModelForm,  ValidationError)
-from django.contrib.admin.widgets import AdminDateWidget
+                          ModelForm, MultipleChoiceField, ValidationError)
+from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple
 from django.utils.translation import ugettext_lazy as _
 
 # this app
@@ -38,24 +38,17 @@ class BaseDynamicEntityForm(ModelForm):
     and EAV fields dynamically added to the form, so when the validation is
     actually done, all EAV fields are present in it (unless Rubric is not defined).
     """
-    # TODO: allow many attributes of the same name per entity:
-    #       - model:
-    #         - add "multiple" (boolean field)
-    #         - drop constraint unique_together
-    #       - abstraction layer:
-    #         - always group attribs with same name
-    #         - if multiple=True, delete&add instead of update
-    #         - tolerate violation of multiple=False by simply ignoring [1:]
-    #       - widget: SelectMultiple or MultipleWidget (probably dropdown + native widget?)
 
     FIELD_CLASSES = {
         'text': CharField,
         'int':  IntegerField,
         'date': DateField,
         'bool': BooleanField,
+        'm2o': MultipleChoiceField,
     }
     FIELD_EXTRA = {
         'date': {'widget': AdminDateWidget},
+        #'m2o': {'widget': FilteredSelectMultiple('xxx verbose name xxx', is_stacked=False)},
     }
     def __init__(self, data=None, *args, **kwargs):
         super(BaseDynamicEntityForm, self).__init__(data, *args, **kwargs)
@@ -67,8 +60,7 @@ class BaseDynamicEntityForm(ModelForm):
         Returns True if dynamic attributes can be added to this form.
         If False is returned, only normal fields will be displayed.
         """
-        if self.instance:
-            return True
+        return bool(self.instance and self.instance.check_eav_allowed())
 
     def _build_dynamic_fields(self):
         # reset form fields
@@ -76,6 +68,7 @@ class BaseDynamicEntityForm(ModelForm):
 
         # do not display dynamic fields if some fields are yet defined
         if not self.check_eav_allowed():
+            print 'eav not allowed in', self.instance
             return
 
         names = self.instance.schema_names
@@ -87,16 +80,46 @@ class BaseDynamicEntityForm(ModelForm):
                 'required':  schema.required,
                 'help_text': schema.help_text,
             }
-            defaults.update(self.FIELD_EXTRA.get(schema.datatype, {}))
 
-            MappedField = self.FIELD_CLASSES[schema.datatype]
+            # FIXME fake datatype -- temporary!
+            datatype = schema.datatype
+            if schema.m2o:
+                datatype = 'm2o'
+                defaults.update({'choices': schema.get_choices(self.instance)})
+
+            defaults.update(self.FIELD_EXTRA.get(datatype, {}))
+
+            MappedField = self.FIELD_CLASSES[datatype]
             self.fields[schema.name] = MappedField(**defaults)
 
+            #def clean_func(self):    # XXX how to add *bound* class attribute???
+            #    "does custom stuff :)  or wait -- we better unpack that in a field!"
+            #    assert 1==0, 'DEBUG'
+            #    return 'xxx'
+            #setattr(self, 'clean_%s' % schema.name, clean_func)
+
             # fill initial data (if attribute was already defined)
+            print 'trying to set initial value for', schema.name
             value = getattr(self.instance, schema.name)
             if value:
                 self.initial[schema.name] = value
+            else:
+                print 'damn', value
+                self.initial[schema.name] = ['s', 'green', 'male', 'red']
+                #print 'forced:', self.instance.size
+        print self.initial
 
+    '''
+    def full_clean(self):
+        super(BaseDynamicEntityForm, self).full_clean()
+
+        #names = self.instance.schema_names
+        #for name in names:
+        #    schema = self.instance.get_schema(name)
+
+        cleaned_data = self.cleaned_data
+        assert 1==0, 'DEBUG'
+    '''
 
     def save(self, commit=True):
         """

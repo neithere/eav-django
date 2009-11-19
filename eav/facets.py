@@ -186,7 +186,7 @@ class RubricFacetSet(object):
             except forms.ValidationError:
                 continue
             lookups.update(facet.get_lookups(value))
-        qs = Item.objects.by_attributes(**dict((str(k),v) for k,v in lookups.items()))
+        qs = Item.objects.filter(**dict((str(k),v) for k,v in lookups.items()))
         order_by_name = self.data.get('order_by')
         if order_by_name:
             qs = self.sort_by_attribute(qs, order_by_name)

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-11-17 16:23+0500\n"
+"POT-Creation-Date: 2009-11-19 02:01+0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Andy Mikhailenko <andy@neithere.net>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -20,74 +20,78 @@ msgstr ""
 msgid "Attribute name must not clash with reserved names (\"%s\")"
 msgstr "Имя атрибута не должно относиться к зарезервированным (\"%s\")"
 
-#: models.py:30
+#: models.py:45
 msgid "text"
 msgstr "текст"
 
-#: models.py:31
+#: models.py:46
 msgid "number"
 msgstr "число"
 
-#: models.py:32
+#: models.py:47
 msgid "date"
 msgstr "дата"
 
-#: models.py:33
+#: models.py:48
 msgid "boolean"
 msgstr "логическое значение"
 
-#: models.py:35
+#: models.py:50
 msgid "title"
 msgstr "заголовок"
 
-#: models.py:35
+#: models.py:50
 msgid "user-friendly attribute name"
 msgstr "название атрибута, отображаемое на сайте"
 
-#: models.py:36
+#: models.py:51
 msgid "name"
 msgstr "имя поля"
 
-#: models.py:38
+#: models.py:53
 msgid "help text"
 msgstr "подсказка"
 
-#: models.py:39
+#: models.py:54
 msgid "short description for administrator"
 msgstr "краткое описание для администратора"
 
-#: models.py:40
+#: models.py:55
 msgid "data type"
 msgstr "тип данных"
 
-#: models.py:41 models.py:56
+#: models.py:64
+msgid "multiple choices"
+msgstr "множественный выбор"
+
+#: models.py:66 models.py:81
 msgid "required"
 msgstr "обязателен"
 
-#: models.py:42
+#: models.py:67
 msgid "include in search"
-msgstr "разрешить поиск"
+msgstr "с поиском"
 
-#: models.py:43
+#: models.py:68
 msgid "include in filters"
-msgstr "разрешить фильтрацию"
+msgstr "с фильтрацией"
 
-#: models.py:44
+#: models.py:69
 msgid "allow sorting"
-msgstr "разрешить сортировку"
+msgstr "с сортировкой"
 
-#: models.py:51
+#: models.py:76
 msgid "attribute schema"
 msgstr "схема атрибута"
 
-#: models.py:51
+#: models.py:76
 msgid "attribute schemata"
 msgstr "схемы атрибутов"
 
-#: models.py:314
+#: models.py:374
 msgid "attribute"
 msgstr "атрибут"
 
-#: models.py:314
+#: models.py:374
 msgid "attributes"
 msgstr "атрибуты"
