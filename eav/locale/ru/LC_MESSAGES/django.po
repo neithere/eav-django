@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-11-19 02:01+0500\n"
+"POT-Creation-Date: 2009-11-19 07:34+0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Andy Mikhailenko <andy@neithere.net>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -88,10 +88,10 @@ msgstr "схема атрибута"
 msgid "attribute schemata"
 msgstr "схемы атрибутов"
 
-#: models.py:374
+#: models.py:411
 msgid "attribute"
 msgstr "атрибут"
 
-#: models.py:374
+#: models.py:411
 msgid "attributes"
 msgstr "атрибуты"

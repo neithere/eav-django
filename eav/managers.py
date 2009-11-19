@@ -19,9 +19,6 @@ class EntityManager(Manager):
 
         qs = self.all()
         for lookup, value in kw.items():
-
-            # FIXME FIXME managed sche,a doesn't get "m2o" flag!!!
-
             qs = self._filter_by_lookup(qs, lookup, value)
         return qs
 

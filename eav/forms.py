@@ -68,13 +68,16 @@ class BaseDynamicEntityForm(ModelForm):
 
         # do not display dynamic fields if some fields are yet defined
         if not self.check_eav_allowed():
-            print 'eav not allowed in', self.instance
             return
 
         names = self.instance.schema_names
 
         for name in names:
             schema = self.instance.get_schema(name)
+
+            if schema.managed:
+                continue
+
             defaults = {
                 'label':     schema.title.capitalize(),
                 'required':  schema.required,
@@ -92,34 +95,10 @@ class BaseDynamicEntityForm(ModelForm):
             MappedField = self.FIELD_CLASSES[datatype]
             self.fields[schema.name] = MappedField(**defaults)
 
-            #def clean_func(self):    # XXX how to add *bound* class attribute???
-            #    "does custom stuff :)  or wait -- we better unpack that in a field!"
-            #    assert 1==0, 'DEBUG'
-            #    return 'xxx'
-            #setattr(self, 'clean_%s' % schema.name, clean_func)
-
             # fill initial data (if attribute was already defined)
-            print 'trying to set initial value for', schema.name
             value = getattr(self.instance, schema.name)
             if value:
                 self.initial[schema.name] = value
-            else:
-                print 'damn', value
-                self.initial[schema.name] = ['s', 'green', 'male', 'red']
-                #print 'forced:', self.instance.size
-        print self.initial
-
-    '''
-    def full_clean(self):
-        super(BaseDynamicEntityForm, self).full_clean()
-
-        #names = self.instance.schema_names
-        #for name in names:
-        #    schema = self.instance.get_schema(name)
-
-        cleaned_data = self.cleaned_data
-        assert 1==0, 'DEBUG'
-    '''
 
     def save(self, commit=True):
         """

@@ -100,6 +100,36 @@ class BaseSchema(Model):
                                   'many-to-one schemata.' % type(self))
 
 
+    def get_managed_schemata(self, entity):
+        """
+        Returns schemata managed by this one. Only applicable to m2o schema.
+        """
+        if not self.m2o:
+            raise ValueError('Cannot get managed schemata: not a many-to-one schema')
+        choices = self.get_choices(entity)
+        names = [get_m2o_schema_name(self.name, choice) for choice,_ in choices]
+        return type(self).objects.filter(name__in=names)
+
+    def get_attrs(self, entity):
+        """
+        Returns available attributes for given entity instance.
+        Handles many-to-one relations transparently.
+        """
+        managed_schemata = self.get_managed_schemata(entity)
+        return Attr.objects.filter(
+            #schema__in = managed_schemata,                      # FIXME do we really need ONLY managed schemata?! probably just not m2o
+            entity_content_type = entity.attrs.content_type,
+            entity_object_id = entity.pk,
+        )
+
+    def get_active_choices(self, entity):
+        choices = self.get_choices(entity)
+        attrs_dict = dict((a.schema.name, a) for a in self.get_attrs(entity))
+        for choice, title in choices:
+            attr = attrs_dict.get(get_m2o_schema_name(self.name, choice))
+            if attr and attr.value:
+                yield choice, title
+
     def save_m2o(self, choices):
         """
         Creates/updates related many-to-one managed schemata.
@@ -169,8 +199,6 @@ class BaseSchema(Model):
         # If schema is not many-to-one, the value is saved to the corresponding
         # Attr instance (which is created or updated).
 
-        print 'saving single attribute "%s" = "%s" in ' % (name, value), entity
-
         schema = schema or self
         lookups = {
             # entity
@@ -192,8 +220,6 @@ class BaseSchema(Model):
 
     def _save_m2o_attr(self, entity, name, value):
         # schema is many-to-one
-
-        print 'saving m2o attribute', name, '=', value, 'in', entity
 
         valid_choices = [get_m2o_schema_name(name, c) for c,t in self.get_choices(entity)]
 
@@ -265,15 +291,7 @@ class BaseEntity(Model):
             if name in self._schemata_dict:
                 schema = self._schemata_dict[name]
                 if schema.m2o:
-                    # make a list of "real" m2o attributes under the single name
-                    value_list = []
-                    choices = [x[0] for x in schema.get_choices(self)]
-                    for choice in choices:
-                        n = get_m2o_schema_name(name, choice)
-                        attr = self._eav_attrs_dict.get(n)
-                        if attr and attr.value:
-                            value_list.append(choice)
-                    return value_list
+                    return [x[0] for x in schema.get_active_choices(self)]
                 attr = self._eav_attrs_dict.get(name)
                 return attr.value if attr else None
         raise AttributeError('%s does not have attribute named "%s".' % (self._meta.object_name, name))
@@ -307,7 +325,8 @@ class BaseEntity(Model):
         schema_model = self.get_schemata_for_model().model
         defaults = {
             'schema_content_type': Attr.schema.get_content_type(schema_model),
-            'schema_object_id__in': self._schemata,
+            'schema_object_id__in': [s.pk for s in self._schemata],
+            #'schema__managed': False,
         }
         return self.attrs.filter(**defaults).select_related()
 
@@ -325,11 +344,11 @@ class BaseEntity(Model):
     def get_schemata_for_instance(self, qs):
         return qs
 
-    #@cached_property
-    @property
+    @cached_property
+    #@property
     def _schemata(self):
-        qs = self.get_schemata_for_model().select_related()
-        return self.get_schemata_for_instance(qs)
+        all_schemata = self.get_schemata_for_model().select_related()
+        return self.get_schemata_for_instance(all_schemata)
 
     #@cached_property
     @property
