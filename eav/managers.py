@@ -3,9 +3,18 @@
 from django.db.models import Manager
 
 
-class EntityManager(Manager):
+class BaseEntityManager(Manager):
 
-    def filter(self, **kw):
+    # TODO: refactor filter() and exclude()   -- see django.db.models.manager and ...query
+
+    def exclude(self, *args, **kw):
+        qs = self.get_query_set().exclude(*args)
+        for lookup, value in kw.items():
+            lookups = self._filter_by_lookup(qs, lookup, value)
+            qs = qs.exclude(**lookups)
+        return qs
+
+    def filter(self, *args, **kw):
         """
         A wrapper around standard filter() method. Allows to construct queries
         involving both normal fields and EAV attributes without thinking about
@@ -17,9 +26,11 @@ class EntityManager(Manager):
         EAV attribute represented by Schema and Attr models.
         """
 
-        qs = self.all()
+        qs = self.get_query_set().filter(*args)
         for lookup, value in kw.items():
-            qs = self._filter_by_lookup(qs, lookup, value)
+            lookups = self._filter_by_lookup(qs, lookup, value)
+            qs = qs.filter(**lookups)
+        if __debug__: print qs.query.as_sql()
         return qs
 
     def _filter_by_lookup(self, qs, lookup, value):
@@ -33,16 +44,18 @@ class EntityManager(Manager):
 
         if name in fields:
             # ordinary model field
-            return qs.filter(**{lookup: value})
+            return {lookup: value}
         elif name in schemata:
             # EAV attribute (Attr instance linked to entity)
             schema = schemata.get(name)
-            if schema.m2o:
-                if sublookup:
-                    raise NameError('%s is not a valid lookup: sublookups cannot '
-                                    'be used with m2o attributes.' % lookup)
-                return self._filter_by_m2o_schema(qs, lookup, value, schema)
+            if schema.datatype == schema.TYPE_MANY:
+                #if sublookup:
+                #    # TODO: enable '__in' and such
+                #    raise NameError('%s is not a valid lookup: sublookups cannot '
+                #                    'be used with m2m attributes.' % lookup)
+                return self._filter_by_m2m_schema(qs, name, sublookup, value, schema)
             else:
+                if __debug__: print 'schema %s has no choices defined.' % schema
                 return self._filter_by_simple_schema(qs, lookup, sublookup, value, schema)
         else:
             raise NameError('Cannot filter items by attributes: unknown '
@@ -58,46 +71,27 @@ class EntityManager(Manager):
         value_lookup = 'attrs__value_%s' % schema.datatype
         if sublookup:
             value_lookup = '%s__%s' % (value_lookup, sublookup)
-        lookups = {
-            # schema
-            'attrs__schema_content_type': schema.attrs.content_type,
-            'attrs__schema_object_id': schema.pk,
-            # value
-            str(value_lookup): value,
+        return {
+            'attrs__schema': schema,
+            str(value_lookup): value
         }
-        return qs.filter(**lookups)
 
-    def _filter_by_m2o_schema(self, qs, lookup, value, schema):
+    def _filter_by_m2m_schema(self, qs, lookup, sublookup, value, schema):
         """
         Filters given entity queryset by an attribute which is linked to given
-        many-to-one schema.
-
-        Actually it is:
-
-        1. "management schema" (one) which can contain a list
-            of choices (defined by get_choices), its value doesn't matter;
-        2. "managed schema" (many) which names are like "m2o_color_blue"
-            where "color" is management schema's name, and "blue"
-            is one of choices. Datatype in bool.
+        many-to-many schema.
         """
-
-        #choices = schema.get_choice_names()    # ['green', 'red', 'blue']
-        schema_model = self.model.get_schemata_for_model().model
-        managed_name = get_m2o_schema_name(schema.name, value)
+        schemata = dict((s.name, s) for s in self.model.get_schemata_for_model())   # TODO cache this dict, see above too
         try:
-            managed_schema = schema_model.objects.get(name=managed_name)
-        except schema_model.DoesNotExist:
+            schema = schemata[lookup]
+        except KeyError:
             # TODO: smarter error message, i.e. how could this happen and what to do
-            raise ValueError(u'Could not find managed m2o schema %s for name "%s" '
-                              'and value "%s"'.encode('utf8') % (managed_name, schema.name, value))
-        lookups = {
-            # schema
-            'attrs__schema_content_type': managed_schema.attrs.content_type,
-            'attrs__schema_object_id': managed_schema.pk,
-            # value
-            'attrs__value_bool': True,
+            raise ValueError(u'Could not find schema for lookup "%s"' % lookup)
+        sublookup = '__%s'%sublookup if sublookup else ''
+        return {
+            'attrs__schema': schema,
+            'attrs__choice__name%s'%sublookup: value,  # TODO: can we filter by id, not name?
         }
-        return qs.filter(**lookups)
 
     def create(self, **kwargs):
         """
@@ -134,3 +128,13 @@ class EntityManager(Manager):
         instance.save(force_insert=True)
 
         return instance
+
+'''
+class BaseSchemaManager(Manager):
+
+    def for_form(self, *args, **kw):
+        return self.filter(choices=None, *args, **kw)
+
+    def for_lookups(self, *args, **kw):
+        return self.filter(datatype__not=self.model.TYPE_MANY, *args, **kw)
+'''

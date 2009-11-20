@@ -34,5 +34,5 @@ class BaseEntityAdmin(ModelAdmin):
 
 class BaseSchemaAdmin(ModelAdmin):
 
-    list_display = ('title', 'name', 'datatype', 'm2o', 'help_text', 'required')
+    list_display = ('title', 'name', 'datatype', 'help_text', 'required')
     prepopulated_fields = {'name': ('title',)}

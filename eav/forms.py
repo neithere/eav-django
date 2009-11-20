@@ -4,13 +4,14 @@
 from copy import deepcopy
 
 # django
-from django.forms import (BooleanField, CharField, DateField, IntegerField,
-                          ModelForm, MultipleChoiceField, ValidationError)
-from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple
+from django.forms import (BooleanField, CharField, CheckboxSelectMultiple,
+                          DateField, IntegerField, ModelForm, MultipleChoiceField,
+                          ValidationError)
+from django.contrib.admin.widgets import AdminDateWidget
 from django.utils.translation import ugettext_lazy as _
 
 # this app
-from models import Attr, BaseEntity
+from models import BaseEntity
 #from widgets import PlainTextWidget
 
 
@@ -44,11 +45,12 @@ class BaseDynamicEntityForm(ModelForm):
         'int':  IntegerField,
         'date': DateField,
         'bool': BooleanField,
-        'm2o': MultipleChoiceField,
+        'many': MultipleChoiceField,
     }
     FIELD_EXTRA = {
         'date': {'widget': AdminDateWidget},
         #'m2o': {'widget': FilteredSelectMultiple('xxx verbose name xxx', is_stacked=False)},
+        #'many': {'widget': CheckboxSelectMultiple},
     }
     def __init__(self, data=None, *args, **kwargs):
         super(BaseDynamicEntityForm, self).__init__(data, *args, **kwargs)
@@ -60,7 +62,7 @@ class BaseDynamicEntityForm(ModelForm):
         Returns True if dynamic attributes can be added to this form.
         If False is returned, only normal fields will be displayed.
         """
-        return bool(self.instance and self.instance.check_eav_allowed())
+        return bool(self.instance)# and self.instance.check_eav_allowed()) # XXX would break form where stuff is _being_ defined
 
     def _build_dynamic_fields(self):
         # reset form fields
