@@ -107,6 +107,7 @@ ValueError: Cannot save eav.tests.Entity.size: expected subset of [u's', u'm', u
 # TODO: if schema changes type, drop all attribs?
 
 # django
+from django.contrib.contenttypes import generic
 from django.db import models
 
 # this app
@@ -146,8 +147,16 @@ class Choice(BaseChoice):
     schema = models.ForeignKey(Schema, related_name='choices')
 
 
+class Attr(BaseAttribute):
+    #entity = models.ForeignKey(Entity, related_name='attrs')
+    schema = models.ForeignKey(Schema, related_name='attrs')
+    choice = models.ForeignKey(Choice, related_name='attrs', null=True)
+
+
 class Entity(BaseEntity):
     title = models.CharField(max_length=100)
+    attrs = generic.GenericRelation(Attr, object_id_field='entity_id',
+                                    content_type_field='entity_type')
 
     @classmethod
     def get_schemata_for_model(cls):
@@ -156,8 +165,3 @@ class Entity(BaseEntity):
     def __unicode__(self):
         return self.title
 
-
-class Attr(BaseAttribute):
-    entity = models.ForeignKey(Entity, related_name='attrs')
-    schema = models.ForeignKey(Schema, related_name='attrs')
-    choice = models.ForeignKey(Choice, related_name='attrs', null=True)

@@ -77,20 +77,15 @@ class BaseDynamicEntityForm(ModelForm):
         for name in names:
             schema = self.instance.get_schema(name)
 
-            if schema.managed:
-                continue
-
             defaults = {
                 'label':     schema.title.capitalize(),
                 'required':  schema.required,
                 'help_text': schema.help_text,
             }
 
-            # FIXME fake datatype -- temporary!
             datatype = schema.datatype
-            if schema.m2o:
-                datatype = 'm2o'
-                defaults.update({'choices': schema.get_choices(self.instance)})
+            if datatype == schema.TYPE_MANY:
+                defaults.update({'choices': schema.get_choices()})
 
             defaults.update(self.FIELD_EXTRA.get(datatype, {}))
 

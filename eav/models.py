@@ -5,8 +5,8 @@ import warnings
 
 # django
 from django.contrib.auth.models import User
-#from django.contrib.contenttypes.models import ContentType
-#from django.contrib.contenttypes import generic
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes import generic
 from django.core.urlresolvers import reverse
 from django.db.models import (BooleanField, CharField, DateField, DateTimeField,
                               FloatField, ForeignKey, ImageField, IntegerField,
@@ -28,6 +28,11 @@ __all__ = ['BaseAttribute', 'BaseChoice', 'BaseEntity', 'BaseSchema']
 
 def slugify_attr_name(name):
     return slugify(name.replace('_', '-')).replace('-', '_')
+
+
+def get_entity_lookups(entity):
+    ctype = ContentType.objects.get_for_model(entity)
+    return {'entity_type': ctype, 'entity_id': entity.pk}
 
 
 class BaseSchema(Model):
@@ -73,7 +78,7 @@ class BaseSchema(Model):
         super(BaseSchema, self).save(**kw)
         self.save_m2m(self.get_choices())
 
-    def get_choices(self):
+    def get_choices(self, entity=None):
         """
         Returns a list of name/title tuples::
 
@@ -84,6 +89,10 @@ class BaseSchema(Model):
         This method must be overloaded by subclasses of BaseSchema to enable
         many-to-one schemata machinery.
         """
+#        choices = self.choices.all()
+#        if entity:
+#            entity.filter_
+#            choices = self.filter_choices_by_entity(choices, entity)
         return [(choice.name, choice.title) for choice in self.choices.all()]
 
     def get_attrs(self, entity):
@@ -91,7 +100,7 @@ class BaseSchema(Model):
         Returns available attributes for given entity instance.
         Handles many-to-one relations transparently.
         """
-        return self.attrs.filter(entity=entity.pk)
+        return self.attrs.filter(**get_entity_lookups(entity))
 
     def save_m2m(self, choices):
         """
@@ -106,12 +115,13 @@ class BaseSchema(Model):
         TODO: There should be a command to explicitly wipe all unused instances.
         """
 
-        # FIXME this doesn't do anything!
-
-        if __debug__: print '%s.save_m2m(%s)' % (self.name, choices)
+        if __debug__: print u'%s.save_m2m(%s)' % (self.name, choices)
         if not self.datatype == self.TYPE_MANY:
             if __debug__: print '  hm, datatype =', self.datatype, ' which is not m2m. bailing out.'
             return
+        warnings.warn('Schema.save_m2m() does not do anything!')
+        """
+        assert 1==0, choices
         # create managed schemata
         for choice, title in choices:
             name = get_m2m_schema_name(self.name, choice)
@@ -128,6 +138,7 @@ class BaseSchema(Model):
                 if ms.title != title:
                     ms.title = title
                     ms.save()
+        """
 
     def save_attr(self, entity, value):
         """
@@ -146,7 +157,7 @@ class BaseSchema(Model):
         * if the value is neither a list nor None, it is wrapped into a list and
           processed as above (i.e. "foo" --> ["foo"]).
         """
-        if __debug__: print 'save_attr(%s, entity=%s, value=%s)' % (self, entity, value)
+        if __debug__: print u'save_attr(%s, entity=%s, value=%s)' % (self, entity, value)
 
         if self.datatype == self.TYPE_MANY:
             self._save_m2m_attr(entity, value)
@@ -165,10 +176,10 @@ class BaseSchema(Model):
         # If schema is not many-to-one, the value is saved to the corresponding
         # Attr instance (which is created or updated).
 
-        if __debug__: print '_save_single_attr(%s, entity=%s, value=%s, schema=%s, create_nulls=%s, extra=%s)' % (self, entity, value, schema, create_nulls, extra)
+        if __debug__: print u'_save_single_attr(%s, entity=%s, value=%s, schema=%s, create_nulls=%s, extra=%s)' % (self, entity, value, schema, create_nulls, extra)
 
         schema = schema or self
-        lookups = dict(extra, entity=entity, schema=schema)
+        lookups = dict(get_entity_lookups(entity), schema=schema, **extra)
         try:
             attr = self.attrs.get(**lookups)
         except self.attrs.model.DoesNotExist:
@@ -181,7 +192,7 @@ class BaseSchema(Model):
 
     def _save_m2m_attr(self, entity, value):
         # FIXME: code became dirty, needs refactoring and optimization
-        if __debug__: print '_save_m2m_attr(%s, entity=%s, value=%s)' % (self, entity, value)
+        if __debug__: print u'_save_m2m_attr(%s, entity=%s, value=%s)' % (self, entity, value)
 
         valid_choices = self.get_choices()
 
@@ -219,19 +230,14 @@ class BaseEntity(Model):
     """
     Entity, the "E" in EAV. This model is abstract and must be subclassed.
     See tests for examples.
-
-    Note: you *must* define schema_model attribute to make things work.
     """
-
-    #attrs = generic.GenericRelation('Attr', content_type_field='entity_content_type',
-    #                                object_id_field='entity_object_id')
 
     objects = BaseEntityManager()
 
     class Meta:
         abstract = True
 
-    def save(self, **kwargs):
+    def save(self, force_eav=False, **kwargs):
         """
         Saves entity instance and creates/updates related attribute instances.
 
@@ -240,9 +246,12 @@ class BaseEntity(Model):
         # save entity
         super(BaseEntity, self).save(**kwargs)
 
-        if not self.check_eav_allowed():
-            if __debug__: print('EAV attributes not saved: instance does not allow that') # xxx debug
-            return
+        # TODO: think about use cases; are we doing it right?
+        #if not self.check_eav_allowed():
+        #    warnings.warn('EAV attributes are going to be saved along with entity'
+        #                  ' despite %s.check_eav_allowed() returned False.'
+        #                  % type(self), RuntimeWarning)
+
 
         # create/update EAV attributes
         for name in self.schema_names:
@@ -255,10 +264,10 @@ class BaseEntity(Model):
             if name in self._schemata_dict:
                 schema = self.get_schema(name)
                 attrs = schema.get_attrs(self)
-                if __debug__:
-                    print 'entity', self
-                    print '%s.get_attrs('%schema.name, name, ') --> all:', [(a.schema.name, a.entity, a.value) for a in schema.attrs.all()]
-                    print '%s.get_attrs('%schema.name, name, ') --> our:', attrs
+                #if __debug__:
+                #    print 'entity', self
+                #    print '%s.get_attrs('%schema.name, name, ') --> all:', [(a.schema.name, a.entity, a.value) for a in schema.attrs.all()]
+                #    print '%s.get_attrs('%schema.name, name, ') --> our:', attrs
                 if schema.datatype == schema.TYPE_MANY:
                     return [a.value.name for a in attrs if a.value]
                 else:
@@ -366,12 +375,16 @@ class BaseChoice(Model):
 
 
 class BaseAttribute(Model):
+    entity_type = ForeignKey(ContentType)
+    entity_id = IntegerField()
+    entity = generic.GenericForeignKey(ct_field="entity_type", fk_field='entity_id')
+
     value_text = TextField(blank=True, null=True)
     value_int = IntegerField(blank=True, null=True)
     value_date = DateField(blank=True, null=True)
     value_bool = NullBooleanField(blank=True)    # TODO: ensure that form invalidates null booleans (??)
 
-    entity = NotImplemented    # must be FK
+    #entity = NotImplemented    # must be FK
     schema = NotImplemented    # must be FK
     choice = NotImplemented    # must be nullable FK
 
@@ -379,7 +392,7 @@ class BaseAttribute(Model):
         abstract = True
         verbose_name, verbose_name_plural = _('attribute'), _('attributes')
         #ordering = ['item', 'schema']
-        unique_together = ('entity', 'schema', 'choice')
+        unique_together = ('entity_type', 'entity_id', 'schema', 'choice')
 
     def __unicode__(self):
         return u'%s: %s "%s"' % (self.entity, self.schema.title, self.value)
