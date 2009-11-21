@@ -115,9 +115,7 @@ class BaseSchema(Model):
         TODO: There should be a command to explicitly wipe all unused instances.
         """
 
-        if __debug__: print u'%s.save_m2m(%s)' % (self.name, choices)
         if not self.datatype == self.TYPE_MANY:
-            if __debug__: print '  hm, datatype =', self.datatype, ' which is not m2m. bailing out.'
             return
         warnings.warn('Schema.save_m2m() does not do anything!')
         """
@@ -157,7 +155,6 @@ class BaseSchema(Model):
         * if the value is neither a list nor None, it is wrapped into a list and
           processed as above (i.e. "foo" --> ["foo"]).
         """
-        if __debug__: print u'save_attr(%s, entity=%s, value=%s)' % (self, entity, value)
 
         if self.datatype == self.TYPE_MANY:
             self._save_m2m_attr(entity, value)
@@ -176,8 +173,6 @@ class BaseSchema(Model):
         # If schema is not many-to-one, the value is saved to the corresponding
         # Attr instance (which is created or updated).
 
-        if __debug__: print u'_save_single_attr(%s, entity=%s, value=%s, schema=%s, create_nulls=%s, extra=%s)' % (self, entity, value, schema, create_nulls, extra)
-
         schema = schema or self
         lookups = dict(get_entity_lookups(entity), schema=schema, **extra)
         try:
@@ -192,16 +187,13 @@ class BaseSchema(Model):
 
     def _save_m2m_attr(self, entity, value):
         # FIXME: code became dirty, needs refactoring and optimization
-        if __debug__: print u'_save_m2m_attr(%s, entity=%s, value=%s)' % (self, entity, value)
 
         valid_choices = self.get_choices()
 
         # drop all attributes for this entity/schema pair
-        if __debug__: print 'dropping', self.get_attrs(entity)
         self.get_attrs(entity).delete()
 
         if not hasattr(value, '__iter__'):
-            if __debug__: print 'not list, coercing', value, 'to', [value]
             value = [value]
 
         enabled_choices = value
@@ -264,10 +256,6 @@ class BaseEntity(Model):
             if name in self._schemata_dict:
                 schema = self.get_schema(name)
                 attrs = schema.get_attrs(self)
-                #if __debug__:
-                #    print 'entity', self
-                #    print '%s.get_attrs('%schema.name, name, ') --> all:', [(a.schema.name, a.entity, a.value) for a in schema.attrs.all()]
-                #    print '%s.get_attrs('%schema.name, name, ') --> our:', attrs
                 if schema.datatype == schema.TYPE_MANY:
                     return [a.value.name for a in attrs if a.value]
                 else:
@@ -318,11 +306,17 @@ class BaseEntity(Model):
     def get_schemata_for_instance(self, qs):
         return qs
 
-    @cached_property
-    #@property
-    def _schemata(self):
+    def get_schemata(self):
+        if hasattr(self, '_schemata_cache') and self._schemata_cache is not None:
+            return self._schemata_cache
         all_schemata = self.get_schemata_for_model().select_related()
-        return self.get_schemata_for_instance(all_schemata)
+        self._schemata_cache = self.get_schemata_for_instance(all_schemata)
+        return self._schemata_cache
+
+    #@cached_property
+    @property
+    def _schemata(self):
+        return self.get_schemata()
 
     #@cached_property
     @property

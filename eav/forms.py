@@ -49,12 +49,11 @@ class BaseDynamicEntityForm(ModelForm):
     }
     FIELD_EXTRA = {
         'date': {'widget': AdminDateWidget},
-        #'m2o': {'widget': FilteredSelectMultiple('xxx verbose name xxx', is_stacked=False)},
+        #'many': {'widget': FilteredSelectMultiple('xxx verbose name xxx', is_stacked=False)},
         #'many': {'widget': CheckboxSelectMultiple},
     }
     def __init__(self, data=None, *args, **kwargs):
         super(BaseDynamicEntityForm, self).__init__(data, *args, **kwargs)
-
         self._build_dynamic_fields()
 
     def check_eav_allowed(self):
