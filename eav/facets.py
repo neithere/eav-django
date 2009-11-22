@@ -4,7 +4,6 @@
 from itertools import chain
 
 # django
-from django.conf import settings
 from django.db import models
 from django import forms
 from django.utils.datastructures import SortedDict
@@ -14,15 +13,10 @@ from django.utils.translation import ugettext as _
 from view_shortcuts.decorators import cached_property
 
 # this app
-from models import Attr, Item
 from fields import RangeField
 
 
-FILTERABLE_FIELDS = getattr(settings, 'CATALOGUE_FILTERABLE_FIELDS', ('price',))
-SORTABLE_FIELDS   = getattr(settings, 'CATALOGUE_SORTABLE_FIELDS',   ('price',))
-
-
-class FakeSchema(object):
+class FakeSchema(object):    # TODO: replace with something in common with m2m schemata?
     """
     A schema-like wrapper for real model fields. Used to maintain unified
     internal API in Facet subclasses.
@@ -34,9 +28,18 @@ class FakeSchema(object):
 
 
 class Facet(object):
-    def __init__(self, rubric, schema):
-        self.rubric = rubric
+    def __init__(self, facet_set, schema=None, field=None):
+        self.facet_set = facet_set
+        assert schema or field, 'Facet must be created with schema or field'
+        assert not (schema and field), 'Facet cannot be created with both schema and field'
         self.schema = schema
+        self.field = field
+
+    def __repr__(self):
+        return u'<%s: %s>' % (self.__class__.__name__, unicode(self))
+
+    def __unicode__(self):
+        return self.schema.title if self.schema else self.field.verbose_name
 
     extra = {}
 
@@ -49,15 +52,20 @@ class Facet(object):
         return self.field_class.widget
 
     @property
-    def field(self):
+    def form_field(self):
         "Returns appropriate form field."
-        defaults = dict(required=False, label=self.schema.title, widget=self.widget)
+        defaults = dict(required=False, label=unicode(self), widget=self.widget)
         defaults.update(self.extra)
         return self.field_class(**defaults)
 
+    @property
+    def attr_name(self):
+        "Returns attribute name for this facet"
+        return self.schema.name if self.schema else self.field.name
+
     def get_lookups(self, value):
         "Returns dictionary of lookups for facet-specific query."
-        return {self.schema.name: value} if value else {}
+        return {self.attr_name: value} if value else {}
 
 
 class TextFacet(Facet):
@@ -65,13 +73,19 @@ class TextFacet(Facet):
 
     @property
     def _choices(self):
-        if isinstance(self.schema, FakeSchema):
-            attrs = Item.objects.filter(rubric=self.rubric)
-            field_name = self.schema.field.name
+        if self.schema:
+            attrs = self.schema.attrs.all()
+
+            # FIXME implementation details exposed ###########
+            if self.schema.datatype == self.schema.TYPE_MANY:
+                field_name = 'choice'
+            else:
+                field_name = 'value_%s' % self.schema.datatype    
         else:
-            attrs = self.schema.attrs.filter(item__rubric=self.rubric)
-            field_name = 'value_%s' % self.schema.datatype    # XXX implementation details exposed
-        choices = set(attrs.values_list(field_name, flat=True))
+            attrs = self.facet_set.get_queryset()
+            field_name = self.attr_name
+
+        choices = set(attrs.values_list(field_name, flat=True).distinct())
         return [(x,x) for x in choices]
 
     @property
@@ -93,8 +107,8 @@ class RangeFacet(Facet):
         if not value:
             return {}
         if not value.stop:
-            return {'%s__gt' % self.schema.name: value.start}
-        return {'%s__range' % self.schema.name: (value.start or 0, value.stop)}
+            return {'%s__gt' % self.attr_name: value.start}
+        return {'%s__range' % self.attr_name: (value.start or 0, value.stop)}
 
 
 class DateFacet(Facet):
@@ -108,7 +122,7 @@ class BooleanFacet(Facet):
     #widget = RadioSelect
 
     def get_lookups(self, value):
-        return {self.schema.name: value} if value is not None else {}
+        return {self.attr_name: value} if value is not None else {}
 
 
 FACET_FOR_DATATYPE_DEFAULTS = {
@@ -116,6 +130,7 @@ FACET_FOR_DATATYPE_DEFAULTS = {
     'int':  RangeFacet, #IntegerFacet,
     'date': DateFacet,
     'bool': BooleanFacet,
+    'many': TextFacet,
 }
 
 FACET_FOR_FIELD_DEFAULTS = {
@@ -123,21 +138,29 @@ FACET_FOR_FIELD_DEFAULTS = {
 }
 
 
-class RubricFacetSet(object):
-    def __init__(self, rubric, data):
-        self.rubric = rubric
+class BaseFacetSet(object):
+    filterable_fields = []
+    sortable_fields = []
+
+    def __init__(self, data):
         self.data = data
 
     def __iter__(self):
         return iter(self.object_list)
 
+    def get_queryset(self):
+        raise NotImplementedError('BaseFacetSet subclasses must define get_queryset()') 
+
+    def get_schemata(self):
+        return self.get_queryset().model.get_schemata_for_model()
+
     @cached_property
     def filterable_schemata(self):
-        return self.rubric.schemata.filter(filtered=True)
+        return self.get_schemata().filter(filtered=True)
 
     @cached_property
     def sortable_schemata(self):
-        return self.rubric.schemata.filter(sortable=True)
+        return self.get_schemata().filter(sortable=True)
 
     @cached_property
     def _schemata_by_name(self):
@@ -148,22 +171,24 @@ class RubricFacetSet(object):
 
     @cached_property
     def filterable_names(self):
-        return [str(s.name) for s in self.filterable_schemata]
+        return self.filterable_fields + [str(s.name) for s in self.filterable_schemata]
 
     @cached_property
     def sortable_names(self):
-        return [str(s.name) for s in self.sortable_schemata] + SORTABLE_FIELDS
+        return self.sortable_fields + [str(s.name) for s in self.sortable_schemata]
 
     def _get_facets(self):
+
         for name in self.filterable_names:
-            schema = self.get_schema(name)
-            FacetClass = FACET_FOR_DATATYPE_DEFAULTS[schema.datatype]
-            yield FacetClass(self.rubric, schema)
-        for name in FILTERABLE_FIELDS:
-            field = Item._meta.get_field(name)
-            FacetClass = FACET_FOR_FIELD_DEFAULTS.get(type(field), TextFacet)
-            schema = FakeSchema(field=field)
-            yield FacetClass(self.rubric, schema)
+            try:
+                schema = self.get_schema(name)
+            except KeyError:
+                field = self.get_queryset().model._meta.get_field(name)
+                FacetClass = FACET_FOR_FIELD_DEFAULTS.get(type(field), TextFacet)
+                yield FacetClass(self, field=field)
+            else:
+                FacetClass = FACET_FOR_DATATYPE_DEFAULTS[schema.datatype]
+                yield FacetClass(self, schema=schema)
 
     @cached_property
     def facets(self):
@@ -172,21 +197,30 @@ class RubricFacetSet(object):
     @cached_property
     def form(self):
         if not hasattr(self, '_form'):
-            fields = SortedDict([(facet.schema.name, facet.field) for facet in self.facets])
+            fields = SortedDict([(facet.attr_name, facet.form_field) for facet in self.facets])
             FormClass = type('%sForm' % self.__class__.__name__, (forms.Form,), fields)        # XXX maybe add rubric slug?
             self._form = FormClass(self.data)
         return self._form
 
-    @cached_property
-    def object_list(self):
-        lookups = {'rubric': self.rubric}
+    def get_lookups(self):
+        lookups = {}
         for facet in self.facets:
             try:
-                value = self.form.fields[facet.schema.name].clean(self.form[facet.schema.name].data)
-            except forms.ValidationError:
+                value = self.form.fields[facet.attr_name].clean(self.form[facet.attr_name].data)
+            except forms.ValidationError as e:
+                if __debug__: print 'ERROR in', facet, e
                 continue
             lookups.update(facet.get_lookups(value))
-        qs = Item.objects.filter(**dict((str(k),v) for k,v in lookups.items()))
+        return lookups
+
+    @cached_property
+    def object_list(self):
+        lookups = self.get_lookups()
+        lookups = dict((str(k),v) for k,v in lookups.items())
+
+        # this odd construct allows to use the EntityManager's smart filter():
+        qs = self.get_queryset().model.objects.filter(**lookups) & self.get_queryset()
+
         order_by_name = self.data.get('order_by')
         if order_by_name:
             qs = self.sort_by_attribute(qs, order_by_name)
@@ -204,7 +238,7 @@ class RubricFacetSet(object):
         ...where `price` is a FloatField, and `colour` is the name of an EAV attribute
         represented by Schema and Attr models.
         """
-        fields   = Item._meta.get_all_field_names()
+        fields   = self.get_queryset().model._meta.get_all_field_names()
         schemata = self.sortable_names
         direction = '-' if self.data.get('order_desc') else ''
         if name in fields:

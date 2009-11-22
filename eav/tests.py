@@ -105,7 +105,33 @@ ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" ins
 [<Entity: T-shirt>]
 >>> Entity.objects.filter(size=large) & Entity.objects.filter(colour='orange')
 [<Entity: Old Dog>]
+
+##
+## facets
+##
+
+# make some schemata available for filtering entities by them
+>>> Schema.objects.filter(name__in=['colour', 'size', 'taste']).update(filtered=True)
+3
+>>> fs = FacetSet({})
+>>> fs.filterable_schemata
+[<Schema: Colour (text)>, <Schema: Size (multiple choices)>, <Schema: Taste (text)>]
+>>> fs.filterable_names
+['price', 'colour', 'size', 'taste']
+>>> fs.facets
+[<TextFacet: Item price>, <TextFacet: Colour>, <TextFacet: Size>, <TextFacet: Taste>]
+>>> [x for x in fs]
+[<Entity: Apple>, <Entity: T-shirt>, <Entity: Orange>, <Entity: Tangerine>, <Entity: Old Dog>]
+>>> [x for x in FacetSet({'colour': 'yellow'})]
+[<Entity: Apple>]
+>>> [x for x in FacetSet({'colour': 'orange'})]
+[<Entity: Orange>, <Entity: Tangerine>, <Entity: Old Dog>]
+>>> [x for x in FacetSet({'colour': 'orange', 'taste': 'sweet'})]
+[<Entity: Orange>, <Entity: Tangerine>]
+>>> [x for x in FacetSet({'size': large.pk})]
+[<Entity: T-shirt>, <Entity: Old Dog>]
 """
+
 # TODO: if schema changes type, drop all attribs?
 
 # django
@@ -113,33 +139,9 @@ from django.contrib.contenttypes import generic
 from django.db import models
 
 # this app
+from facets import BaseFacetSet
 from models import BaseAttribute, BaseChoice, BaseEntity, BaseSchema
 
-""" TODO:
->>> color = Schema.objects.create(name='color', datatype='many')
->>> dir(color.choices)
->>> color.choices.create()
->>> color.save()
->>> Entity.objects.create(title='apple', color=['green', 'red'])
-<Entity ...>
->>> [s.name for s in Schema.objects.all()]
-['color', 'm2o_color_green', 'm2o_color_red']
->>> qs = Entity.objects.filter(color='green')
-[<Entity ...>]
->>> qs = Entity.objects.filter(color='red')
-[<Entity ...>]
->>> e = qs[0]
->>> e.color
-['green', 'red']
->>> e.color = ['green']
->>> e.save()
->>> qs = Entity.objects.filter(color='green')
-[<Entity ...>]
->>> qs = Entity.objects.filter(color='red')
-[]
->>> x
-### this is NOT a test; tests are on top of the file!!! ###
-"""
 
 class Schema(BaseSchema):
     pass
@@ -157,6 +159,7 @@ class Attr(BaseAttribute):
 
 class Entity(BaseEntity):
     title = models.CharField(max_length=100)
+    price = models.IntegerField(blank=True, null=True, verbose_name='Item price')
     attrs = generic.GenericRelation(Attr, object_id_field='entity_id',
                                     content_type_field='entity_type')
 
@@ -167,3 +170,10 @@ class Entity(BaseEntity):
     def __unicode__(self):
         return self.title
 
+
+class FacetSet(BaseFacetSet):
+    filterable_fields = ['price']
+    sortable_fields = ['price']
+
+    def get_queryset(self):
+        return Entity.objects.all()     # can be pre-filtered using custom FacetSet.__init__

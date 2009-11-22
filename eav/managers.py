@@ -30,7 +30,6 @@ class BaseEntityManager(Manager):
         for lookup, value in kw.items():
             lookups = self._filter_by_lookup(qs, lookup, value)
             qs = qs.filter(**lookups)
-        if __debug__: print qs.query.as_sql()
         return qs
 
     def _filter_by_lookup(self, qs, lookup, value):
