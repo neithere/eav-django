@@ -8,7 +8,7 @@
 
 >>> colour = Schema.objects.create(title='Colour', datatype=Schema.TYPE_TEXT)
 >>> colour
-<Schema: Colour (text) >
+<Schema: Colour (text)>
 >>> colour.name              #  <-- automatically generated from title
 'colour'
 >>> taste = Schema.objects.create(title='Taste', datatype=Schema.TYPE_TEXT)
@@ -42,66 +42,68 @@
 ##
 
 >>> size = Schema.objects.create(name='size', title='Size', datatype=Schema.TYPE_MANY)
->>> for choice in 'S', 'M', 'L':
-...     size.choices.create(title=choice)
-<Choice: Size "S">
-<Choice: Size "M">
-<Choice: Size "L">
+>>> small  = size.choices.create(title='S')
+>>> medium = size.choices.create(title='M')
+>>> large  = size.choices.create(title='L')
+>>> small
+<Choice: S>
+>>> large.schema
+<Schema: Size (multiple choices)>
 >>> e = Entity(title='T-shirt')
->>> e.size = u's'
+>>> e.size = small
 >>> e.save()
 >>> e2 = Entity.objects.get(pk=e.pk)
 >>> e2.size
-[u's']
->>> e2.size = [u'm', u'l']
+[<Choice: S>]
+>>> e2.size = [medium, large]
 >>> e2.save()
 >>> e3 = Entity.objects.get(pk=e.pk)
 >>> e3.size
-[u'm', u'l']
+[<Choice: M>, <Choice: L>]
 >>> Attr.objects.all()
 [<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">, \
-<Attr: T-shirt: Size "Size "M"">, <Attr: T-shirt: Size "Size "L"">]
+<Attr: T-shirt: Size "M">, <Attr: T-shirt: Size "L">]
 >>> e2.size = ['wrong choice']
 >>> e2.save()
 Traceback (most recent call last):
     ...
-ValueError: Cannot save eav.tests.Entity.size: expected subset of [u's', u'm', u'l'], got "['wrong choice']"
->>> e2.size = [u's', u'l']
+ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" instance.
+>>> e2.size = [small, large]
 >>> e2.save()
 >>> e3 = Entity.objects.get(pk=e.pk)
 >>> e3.size
-[u's', u'l']
+[<Choice: S>, <Choice: L>]
 >>> Attr.objects.all()
 [<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">, \
-<Attr: T-shirt: Size "Size "S"">, <Attr: T-shirt: Size "Size "L"">]
+<Attr: T-shirt: Size "S">, <Attr: T-shirt: Size "L">]
 
 ##
 ## combined
 ##
 
->>> Entity.objects.create(title='Orange', colour='orange', taste='sweet', size='m')
+>>> Entity.objects.create(title='Orange', colour='orange', taste='sweet', size=medium)
 <Entity: Orange>
->>> Entity.objects.create(title='Tangerine', colour='orange', taste='sweet', size='s')
+>>> Entity.objects.create(title='Tangerine', colour='orange', taste='sweet', size=small)
 <Entity: Tangerine>
->>> Entity.objects.create(title='Old Dog', colour='orange', taste='bitter', size='l')
+>>> Entity.objects.create(title='Old Dog', colour='orange', taste='bitter', size=large)
 <Entity: Old Dog>
 
 >>> Entity.objects.filter(taste='sweet')
 [<Entity: Apple>, <Entity: Orange>, <Entity: Tangerine>]
->>> Entity.objects.filter(colour='orange', size__in=['s','l'])
+>>> Entity.objects.filter(colour='orange', size__in=[small, large])
 [<Entity: Tangerine>, <Entity: Old Dog>]
 
 #
 # exclude() fetches objects that either have given attribute(s) with other values
 # or don't have any attributes for this schema at all:
 #
->>> Entity.objects.exclude(size='s')
+>>> Entity.objects.exclude(size=small)
 [<Entity: Apple>, <Entity: Orange>, <Entity: Old Dog>]
 >>> Entity.objects.exclude(taste='sweet')
 [<Entity: T-shirt>, <Entity: Old Dog>]
->>> Entity.objects.filter(size='l') & Entity.objects.exclude(colour='orange')
+>>> Entity.objects.filter(size=large) & Entity.objects.exclude(colour='orange')
 [<Entity: T-shirt>]
->>> Entity.objects.filter(size='l') & Entity.objects.filter(colour='orange')
+>>> Entity.objects.filter(size=large) & Entity.objects.filter(colour='orange')
 [<Entity: Old Dog>]
 """
 # TODO: if schema changes type, drop all attribs?

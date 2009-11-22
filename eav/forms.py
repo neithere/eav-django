@@ -5,9 +5,9 @@ from copy import deepcopy
 
 # django
 from django.forms import (BooleanField, CharField, CheckboxSelectMultiple,
-                          DateField, IntegerField, ModelForm, MultipleChoiceField,
+                          DateField, IntegerField, ModelForm, ModelMultipleChoiceField,    #MultipleChoiceField,
                           ValidationError)
-from django.contrib.admin.widgets import AdminDateWidget
+from django.contrib.admin.widgets import AdminDateWidget    #, RelatedFieldWidgetWrapper
 from django.utils.translation import ugettext_lazy as _
 
 # this app
@@ -45,7 +45,7 @@ class BaseDynamicEntityForm(ModelForm):
         'int':  IntegerField,
         'date': DateField,
         'bool': BooleanField,
-        'many': MultipleChoiceField,
+        'many': ModelMultipleChoiceField,    #RelatedFieldWidgetWrapper(MultipleChoiceField),
     }
     FIELD_EXTRA = {
         'date': {'widget': AdminDateWidget},
@@ -71,9 +71,7 @@ class BaseDynamicEntityForm(ModelForm):
         if not self.check_eav_allowed():
             return
 
-        names = self.instance.schema_names
-
-        for name in names:
+        for name in self.instance.schema_names:
             schema = self.instance.get_schema(name)
 
             defaults = {
@@ -84,7 +82,8 @@ class BaseDynamicEntityForm(ModelForm):
 
             datatype = schema.datatype
             if datatype == schema.TYPE_MANY:
-                defaults.update({'choices': schema.get_choices()})
+                defaults.update({'queryset': schema.get_choices(),
+                                 'initial': [x.pk for x in getattr(self.instance, name)]})
 
             defaults.update(self.FIELD_EXTRA.get(datatype, {}))
 
@@ -93,7 +92,7 @@ class BaseDynamicEntityForm(ModelForm):
 
             # fill initial data (if attribute was already defined)
             value = getattr(self.instance, schema.name)
-            if value:
+            if value and not datatype == schema.TYPE_MANY:    # m2m is already done above
                 self.initial[schema.name] = value
 
     def save(self, commit=True):

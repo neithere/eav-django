@@ -71,8 +71,8 @@ class BaseSchema(Model):
         ordering = ['title']
 
     def __unicode__(self):
-        return u'%s (%s) %s' % (self.title, self.get_datatype_display(),
-                                _('required') if self.required else '')
+        return u'%s (%s)%s' % (self.title, self.get_datatype_display(),
+                                u' %s'%_('required') if self.required else '')
 
     def save(self, **kw):
         super(BaseSchema, self).save(**kw)
@@ -93,7 +93,7 @@ class BaseSchema(Model):
 #        if entity:
 #            entity.filter_
 #            choices = self.filter_choices_by_entity(choices, entity)
-        return [(choice.name, choice.title) for choice in self.choices.all()]
+        return self.choices.all()   #[(choice.name, choice.title) for choice in self.choices.all()]
 
     def get_attrs(self, entity):
         """
@@ -161,7 +161,7 @@ class BaseSchema(Model):
         else:
             self._save_single_attr(entity, value)
 
-    def _save_single_attr(self, entity, value, schema=None, create_nulls=False, extra={}):
+    def _save_single_attr(self, entity, value=None, schema=None, create_nulls=False, extra={}):
         """
         Creates or updates an EAV attribute for given entity with given value.
 
@@ -186,9 +186,6 @@ class BaseSchema(Model):
             attr.save()
 
     def _save_m2m_attr(self, entity, value):
-        # FIXME: code became dirty, needs refactoring and optimization
-
-        valid_choices = self.get_choices()
 
         # drop all attributes for this entity/schema pair
         self.get_attrs(entity).delete()
@@ -196,26 +193,14 @@ class BaseSchema(Model):
         if not hasattr(value, '__iter__'):
             value = [value]
 
-        enabled_choices = value
-
-        # If a list item is not in available choices, ValueError is raised
-        if not set(enabled_choices).issubset([x[0] for x in valid_choices]):
-            raise ValueError(u'Cannot save %s.%s.%s: expected subset of %s, '
-                              'got "%s"'.encode('utf8') % (type(entity).__module__,
-                                    type(entity).__name__, self.name,
-                                    [x[0] for x in self.get_choices()], value))
-
         # Attr instances for corresponding managed m2m schemata are updated
-        for choice in self.choices.all():
-            #schema_name = get_m2m_schema_name(name, choice)
-            if choice.name in enabled_choices:
-                self._save_single_attr(
-                    entity,
-                    value = None,   #True if schema_name in enabled_choices else False,
-                    schema = self,  #type(self).objects.get(name=schema_name),
-                    create_nulls = True,    # <-- because it's not value_X=Y but choice=Y
-                    extra = {'choice': choice}
-                )
+        for choice in value:
+            self._save_single_attr(
+                entity,
+                schema = self,
+                create_nulls = True,
+                extra = {'choice': choice}
+            )
 
 
 class BaseEntity(Model):
@@ -257,7 +242,7 @@ class BaseEntity(Model):
                 schema = self.get_schema(name)
                 attrs = schema.get_attrs(self)
                 if schema.datatype == schema.TYPE_MANY:
-                    return [a.value.name for a in attrs if a.value]
+                    return [a.value for a in attrs if a.value]
                 else:
                     return attrs[0].value if attrs else None
         raise AttributeError('%s does not have attribute named "%s".' % (self._meta.object_name, name))
@@ -356,16 +341,13 @@ class BaseEntity(Model):
 
 class BaseChoice(Model):
     title = CharField(max_length=100)
-    name = AutoSlugField(_('name'), populate_from='title',
-                             editable=True, blank=True, slugify=slugify_attr_name)
     schema = NotImplemented
 
     class Meta:
         abstract = True
-        unique_together = ('schema', 'name')
 
     def __unicode__(self):
-        return u'%s "%s"' % (self.schema.title, self.title)
+        return self.title   #u'%s "%s"' % (self.schema.title, self.title)
 
 
 class BaseAttribute(Model):

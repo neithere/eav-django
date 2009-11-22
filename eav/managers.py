@@ -55,7 +55,6 @@ class BaseEntityManager(Manager):
                 #                    'be used with m2m attributes.' % lookup)
                 return self._filter_by_m2m_schema(qs, name, sublookup, value, schema)
             else:
-                if __debug__: print 'schema %s has no choices defined.' % schema
                 return self._filter_by_simple_schema(qs, lookup, sublookup, value, schema)
         else:
             raise NameError('Cannot filter items by attributes: unknown '
@@ -90,7 +89,7 @@ class BaseEntityManager(Manager):
         sublookup = '__%s'%sublookup if sublookup else ''
         return {
             'attrs__schema': schema,
-            'attrs__choice__name%s'%sublookup: value,  # TODO: can we filter by id, not name?
+            'attrs__choice%s'%sublookup: value,  # TODO: can we filter by id, not name?
         }
 
     def create(self, **kwargs):
