@@ -42,16 +42,31 @@ class BaseEntityManager(Manager):
             name, sublookup = lookup, None
 
         if name in fields:
-            # ordinary model field
+            try:
+                related_model = getattr(self.model, name).related.model
+            except AttributeError:
+                pass
+            else:
+                # check if sublookup is another schema
+                # TODO: handle nested sublookups (probably these blocks should be taken out of the Manager)
+                related_schemata = dict((s.name, s) for s in related_model.get_schemata_for_model())
+                if sublookup in related_schemata:
+                    # EAV attribute (Attr instance linked to entity)
+                    schema = related_schemata.get(sublookup)
+                    if schema.datatype == schema.TYPE_MANY:
+                        d = self._filter_by_m2m_schema(qs, sublookup, None, value, schema, model=related_model)
+                    else:
+                        d = self._filter_by_simple_schema(qs, sublookup, None, value, schema)
+                    prefixed = dict(('%s__%s' % (name, k), v) for k, v in d.items())
+                    #assert 1==0, (schema, prefixed)
+                    return prefixed
+            # okay, treat as ordinary model field
             return {lookup: value}
+
         elif name in schemata:
             # EAV attribute (Attr instance linked to entity)
             schema = schemata.get(name)
             if schema.datatype == schema.TYPE_MANY:
-                #if sublookup:
-                #    # TODO: enable '__in' and such
-                #    raise NameError('%s is not a valid lookup: sublookups cannot '
-                #                    'be used with m2m attributes.' % lookup)
                 return self._filter_by_m2m_schema(qs, name, sublookup, value, schema)
             else:
                 return self._filter_by_simple_schema(qs, lookup, sublookup, value, schema)
@@ -74,12 +89,13 @@ class BaseEntityManager(Manager):
             str(value_lookup): value
         }
 
-    def _filter_by_m2m_schema(self, qs, lookup, sublookup, value, schema):
+    def _filter_by_m2m_schema(self, qs, lookup, sublookup, value, schema, model=None):
         """
         Filters given entity queryset by an attribute which is linked to given
         many-to-many schema.
         """
-        schemata = dict((s.name, s) for s in self.model.get_schemata_for_model())   # TODO cache this dict, see above too
+        model = model or self.model
+        schemata = dict((s.name, s) for s in model.get_schemata_for_model())   # TODO cache this dict, see above too
         try:
             schema = schemata[lookup]
         except KeyError:
