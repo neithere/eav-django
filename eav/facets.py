@@ -16,30 +16,20 @@ from view_shortcuts.decorators import cached_property
 from fields import RangeField
 
 
-class FakeSchema(object):    # TODO: replace with something in common with m2m schemata?
-    """
-    A schema-like wrapper for real model fields. Used to maintain unified
-    internal API in Facet subclasses.
-    """
-    def __init__(self, field):
-        self.field = field
-        self.title = unicode(self.field.verbose_name)
-        self.name  = field.name
-
-
 class Facet(object):
-    def __init__(self, facet_set, schema=None, field=None):
+    def __init__(self, facet_set, schema=None, field=None, lookup_prefix=''):
         self.facet_set = facet_set
         assert schema or field, 'Facet must be created with schema or field'
         assert not (schema and field), 'Facet cannot be created with both schema and field'
         self.schema = schema
         self.field = field
+        self.lookup_prefix = lookup_prefix
 
     def __repr__(self):
         return u'<%s: %s>' % (self.__class__.__name__, unicode(self))
 
     def __unicode__(self):
-        return self.schema.title if self.schema else self.field.verbose_name
+        return unicode(self.schema.title if self.schema else self.field.verbose_name)
 
     extra = {}
 
@@ -63,9 +53,13 @@ class Facet(object):
         "Returns attribute name for this facet"
         return self.schema.name if self.schema else self.field.name
 
+    @property
+    def lookup_name(self):
+        return '%s%s' % (self.lookup_prefix, self.attr_name)
+
     def get_lookups(self, value):
         "Returns dictionary of lookups for facet-specific query."
-        return {self.attr_name: value} if value else {}
+        return {self.lookup_name: value} if value else {}
 
 
 class TextFacet(Facet):
@@ -80,11 +74,10 @@ class TextFacet(Facet):
             if self.schema.datatype == self.schema.TYPE_MANY:
                 field_name = 'choice'
             else:
-                field_name = 'value_%s' % self.schema.datatype    
+                field_name = 'value_%s' % self.schema.datatype
         else:
             attrs = self.facet_set.get_queryset()
             field_name = self.attr_name
-
         choices = set(attrs.values_list(field_name, flat=True).distinct())
         return [(x,x) for x in choices]
 
@@ -107,8 +100,8 @@ class RangeFacet(Facet):
         if not value:
             return {}
         if not value.stop:
-            return {'%s__gt' % self.attr_name: value.start}
-        return {'%s__range' % self.attr_name: (value.start or 0, value.stop)}
+            return {'%s__gt' % self.lookup_name: value.start}
+        return {'%s__range' % self.lookup_name: (value.start or 0, value.stop)}
 
 
 class DateFacet(Facet):
@@ -122,7 +115,7 @@ class BooleanFacet(Facet):
     #widget = RadioSelect
 
     def get_lookups(self, value):
-        return {self.attr_name: value} if value is not None else {}
+        return {self.lookup_name: value} if value is not None else {}
 
 
 FACET_FOR_DATATYPE_DEFAULTS = {
@@ -148,7 +141,7 @@ class BaseFacetSet(object):
     def __iter__(self):
         return iter(self.object_list)
 
-    def get_queryset(self):
+    def get_queryset(self, **kwargs):
         raise NotImplementedError('BaseFacetSet subclasses must define get_queryset()') 
 
     def get_schemata(self):
@@ -178,17 +171,18 @@ class BaseFacetSet(object):
         return self.sortable_fields + [str(s.name) for s in self.sortable_schemata]
 
     def _get_facets(self):
+        # TODO: refactor this
 
         for name in self.filterable_names:
             try:
-                schema = self.get_schema(name)
-            except KeyError:
-                field = self.get_queryset().model._meta.get_field(name)
+                schema, lookup_prefix = self.get_schema_and_lookup(name)
+            except KeyError:    # XXX  are we sure it will raise KeyError? depends on implementation!
+                field, lookup_prefix = self.get_field_and_lookup(name)
                 FacetClass = FACET_FOR_FIELD_DEFAULTS.get(type(field), TextFacet)
-                yield FacetClass(self, field=field)
+                yield FacetClass(self, field=field, lookup_prefix=lookup_prefix)
             else:
                 FacetClass = FACET_FOR_DATATYPE_DEFAULTS[schema.datatype]
-                yield FacetClass(self, schema=schema)
+                yield FacetClass(self, schema=schema, lookup_prefix=lookup_prefix)
 
     @cached_property
     def facets(self):
@@ -202,24 +196,39 @@ class BaseFacetSet(object):
             self._form = FormClass(self.data)
         return self._form
 
+    def get_field_and_lookup(self, name):
+        """
+        Returns field instance and lookup prefix for given attribute name.
+        Can be overloaded in subclasses to provide filtering across multiple models.
+        """
+        name = self.get_queryset().model._meta.get_field(name)
+        lookup_prefix = ''
+        return name, lookup_prefix
+
+    def get_schema_and_lookup(self, name):
+        schema = self.get_schema(name)
+        lookup_prefix = ''
+        return schema, lookup_prefix
+
     def get_lookups(self):
         lookups = {}
         for facet in self.facets:
-            try:
-                value = self.form.fields[facet.attr_name].clean(self.form[facet.attr_name].data)
-            except forms.ValidationError as e:
-                if __debug__: print 'ERROR in', facet, e
-                continue
+            data  = self.form[facet.attr_name].data
+            field = self.form.fields[facet.attr_name]
+            value = field.clean(data)
             lookups.update(facet.get_lookups(value))
         return lookups
 
     @cached_property
     def object_list(self):
-        lookups = self.get_lookups()
+        try:
+            lookups = self.get_lookups()
+        except forms.ValidationError:
+            return []
         lookups = dict((str(k),v) for k,v in lookups.items())
 
-        # this odd construct allows to use the EntityManager's smart filter():
-        qs = self.get_queryset().model.objects.filter(**lookups) & self.get_queryset()
+        # assume to use the EntityManager's smart filter()
+        qs = self.get_queryset(**lookups).distinct()
 
         order_by_name = self.data.get('order_by')
         if order_by_name:

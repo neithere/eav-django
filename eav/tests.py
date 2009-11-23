@@ -175,5 +175,5 @@ class FacetSet(BaseFacetSet):
     filterable_fields = ['price']
     sortable_fields = ['price']
 
-    def get_queryset(self):
-        return Entity.objects.all()     # can be pre-filtered using custom FacetSet.__init__
+    def get_queryset(self, **kwargs):
+        return Entity.objects.filter(**kwargs)     # can be pre-filtered using custom FacetSet.__init__
