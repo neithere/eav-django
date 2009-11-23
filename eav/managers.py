@@ -37,7 +37,7 @@ class BaseEntityManager(Manager):
         schemata = dict((s.name, s) for s in self.model.get_schemata_for_model())
 
         if '__' in lookup:
-            name, sublookup = lookup.split('__')
+            name, sublookup = lookup.split('__', 1)
         else:
             name, sublookup = lookup, None
 
