@@ -68,13 +68,12 @@ class TextFacet(Facet):
     @property
     def _choices(self):
         if self.schema:
-            attrs = self.schema.attrs.all()
+            if self.schema.datatype == self.schema.TYPE_MANY:
+                return [(x.pk, x) for x in self.schema.get_choices()]   # TODO: intersection with entity and, maybe, FacetSet?
 
             # FIXME implementation details exposed ###########
-            if self.schema.datatype == self.schema.TYPE_MANY:
-                field_name = 'choice'
-            else:
-                field_name = 'value_%s' % self.schema.datatype
+            attrs = self.schema.attrs.all()    # FIXME in shop don't need *all* attrs, just those in rubric
+            field_name = 'value_%s' % self.schema.datatype
         else:
             attrs = self.facet_set.get_queryset()
             field_name = self.attr_name
