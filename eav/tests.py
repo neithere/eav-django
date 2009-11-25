@@ -30,6 +30,8 @@
 >>> e.save()
 >>> e.attrs.all()
 [<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">]
+>>> [x for x in e]
+[<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">]
 >>> Entity.objects.filter(title='Apple')
 [<Entity: Apple>]
 >>> Entity.objects.filter(colour='yellow')

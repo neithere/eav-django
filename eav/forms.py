@@ -71,8 +71,7 @@ class BaseDynamicEntityForm(ModelForm):
         if not self.check_eav_allowed():
             return
 
-        for name in self.instance.schema_names:
-            schema = self.instance.get_schema(name)
+        for schema in self.instance.get_schemata():
 
             defaults = {
                 'label':     schema.title.capitalize(),
@@ -82,8 +81,9 @@ class BaseDynamicEntityForm(ModelForm):
 
             datatype = schema.datatype
             if datatype == schema.TYPE_MANY:
+                choices = getattr(self.instance, schema.name)
                 defaults.update({'queryset': schema.get_choices(),
-                                 'initial': [x.pk for x in getattr(self.instance, name)]})
+                                 'initial': [x.pk for x in choices]})
 
             defaults.update(self.FIELD_EXTRA.get(datatype, {}))
 
@@ -111,7 +111,7 @@ class BaseDynamicEntityForm(ModelForm):
         instance = super(BaseDynamicEntityForm, self).save(commit=False)
 
         # assign attributes
-        for name in instance.schema_names:
+        for name in instance.get_schema_names():
             value = self.cleaned_data.get(name)
             setattr(instance, name, value)
 

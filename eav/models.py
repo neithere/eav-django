@@ -74,10 +74,6 @@ class BaseSchema(Model):
         return u'%s (%s)%s' % (self.title, self.get_datatype_display(),
                                 u' %s'%_('required') if self.required else '')
 
-    def save(self, **kw):
-        super(BaseSchema, self).save(**kw)
-        self.save_m2m(self.get_choices())
-
     def get_choices(self, entity=None):
         """
         Returns a list of name/title tuples::
@@ -89,11 +85,7 @@ class BaseSchema(Model):
         This method must be overloaded by subclasses of BaseSchema to enable
         many-to-one schemata machinery.
         """
-#        choices = self.choices.all()
-#        if entity:
-#            entity.filter_
-#            choices = self.filter_choices_by_entity(choices, entity)
-        return self.choices.all()   #[(choice.name, choice.title) for choice in self.choices.all()]
+        return self.choices.all()
 
     def get_attrs(self, entity):
         """
@@ -101,42 +93,6 @@ class BaseSchema(Model):
         Handles many-to-one relations transparently.
         """
         return self.attrs.filter(**get_entity_lookups(entity))
-
-    def save_m2m(self, choices):
-        """
-        Creates/updates related many-to-one managed schemata.
-        (By the way, these "managed" schemata are managed by this very method.)
-
-        Normally called automatically each time the schema is saved.
-
-        This method does not remove managed schemata that are not more in use
-        because there may be attributes attached.
-
-        TODO: There should be a command to explicitly wipe all unused instances.
-        """
-
-        if not self.datatype == self.TYPE_MANY:
-            return
-        warnings.warn('Schema.save_m2m() does not do anything!')
-        """
-        assert 1==0, choices
-        # create managed schemata
-        for choice, title in choices:
-            name = get_m2m_schema_name(self.name, choice)
-            try:
-                ms = type(self).objects.get(name=name)
-            except type(self).DoesNotExist:
-                ms = type(self).objects.create(
-                    name = name,
-                    title = title,
-                    datatype = self.TYPE_BOOLEAN,
-                    namespace = self,
-                )
-            else:
-                if ms.title != title:
-                    ms.title = title
-                    ms.save()
-        """
 
     def save_attr(self, entity, value):
         """
@@ -231,56 +187,27 @@ class BaseEntity(Model):
 
 
         # create/update EAV attributes
-        for name in self.schema_names:
-            schema = self.get_schema(name)
-            value = getattr(self, name, None)
+        for schema in self.get_schemata():
+            value = getattr(self, schema.name, None)
             schema.save_attr(self, value)
 
     def __getattr__(self, name):
         if not name.startswith('_'):
-            if name in self._schemata_dict:
+            if name in self.get_schema_names():
                 schema = self.get_schema(name)
                 attrs = schema.get_attrs(self)
                 if schema.datatype == schema.TYPE_MANY:
                     return [a.value for a in attrs if a.value]
                 else:
                     return attrs[0].value if attrs else None
-        raise AttributeError('%s does not have attribute named "%s".' % (self._meta.object_name, name))
+        raise AttributeError('%s does not have attribute named "%s".' %
+                             (self._meta.object_name, name))
 
     def __iter__(self):
         "Iterates over non-empty EAV attributes. Normal fields are not included."
-        return iter([a for a in self._eav_attrs if getattr(self, a.schema.name, None)])
-
-    # names
-
-    #@cached_property
-    @property
-    def field_names(self):
-        return self._meta.get_all_field_names()
-
-    #@cached_property
-    @property
-    def schema_names(self):
-        return [s.name for s in self._schemata]
-
-    #@cached_property
-    @property
-    def all_names(self):
-        return self.field_names + self.schema_names
-
-    # linked EAV data
-
-    #@cached_property
-    @property
-    def _eav_attrs(self):
-        schema_model = self.get_schemata_for_model().model
-        defaults = {'schema__in': [s.pk for s in self._schemata]}
-        return self.attrs.filter(**defaults).select_related()
-
-    #@cached_property
-    @property
-    def _eav_attrs_dict(self):
-        return dict((a.schema.name, a) for a in self._eav_attrs)
+        for attr in self.attrs.select_related():
+            if getattr(self, attr.schema.name, None):
+                yield attr
 
     @classmethod
     def get_schemata_for_model(cls):
@@ -296,20 +223,18 @@ class BaseEntity(Model):
             return self._schemata_cache
         all_schemata = self.get_schemata_for_model().select_related()
         self._schemata_cache = self.get_schemata_for_instance(all_schemata)
+        self._schemata_cache_dict = dict((s.name, s) for s in self._schemata_cache)
         return self._schemata_cache
 
-    #@cached_property
-    @property
-    def _schemata(self):
-        return self.get_schemata()
-
-    #@cached_property
-    @property
-    def _schemata_dict(self):
-        return dict((s.name, s) for s in self._schemata)
+    def get_schema_names(self):
+        if not hasattr(self, '_schemata_cache_dict'):
+            self.get_schemata()
+        return self._schemata_cache_dict.keys()
 
     def get_schema(self, name):
-        return self._schemata_dict[name]
+        if not hasattr(self, '_schemata_cache_dict'):
+            self.get_schemata()
+        return self._schemata_cache_dict[name]
 
     def check_eav_allowed(self):
         """
@@ -360,14 +285,13 @@ class BaseAttribute(Model):
     value_date = DateField(blank=True, null=True)
     value_bool = NullBooleanField(blank=True)    # TODO: ensure that form invalidates null booleans (??)
 
-    #entity = NotImplemented    # must be FK
     schema = NotImplemented    # must be FK
     choice = NotImplemented    # must be nullable FK
 
     class Meta:
         abstract = True
         verbose_name, verbose_name_plural = _('attribute'), _('attributes')
-        #ordering = ['item', 'schema']
+        ordering = ['entity_type', 'entity_id', 'schema']
         unique_together = ('entity_type', 'entity_id', 'schema', 'choice')
 
     def __unicode__(self):
