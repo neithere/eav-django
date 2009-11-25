@@ -67,7 +67,7 @@ class BaseSchema(Model):
 
     class Meta:
         abstract = True
-        verbose_name, verbose_name_plural = _('attribute schema'), _('attribute schemata')
+        verbose_name, verbose_name_plural = _('schema'), _('schemata')
         ordering = ['title']
 
     def __unicode__(self):

@@ -81,17 +81,17 @@ msgid "allow sorting"
 msgstr "с сортировкой"
 
 #: models.py:76
-msgid "attribute schema"
-msgstr "схема атрибута"
+msgid "schema"
+msgstr "описание свойства"
 
 #: models.py:76
-msgid "attribute schemata"
-msgstr "схемы атрибутов"
+msgid "schemata"
+msgstr "описания свойств"
 
 #: models.py:411
 msgid "attribute"
-msgstr "атрибут"
+msgstr "свойство"
 
 #: models.py:411
 msgid "attributes"
-msgstr "атрибуты"
+msgstr "свойства"
