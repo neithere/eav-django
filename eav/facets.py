@@ -134,14 +134,20 @@ class BaseFacetSet(object):
     filterable_fields = []
     sortable_fields = []
 
+    def __getitem__(self, k):
+        return self.object_list[k]
+
     def __init__(self, data):
         self.data = data
 
     def __iter__(self):
         return iter(self.object_list)
 
+    def __len__(self):
+        return self.object_list.count()
+
     def get_queryset(self, **kwargs):
-        raise NotImplementedError('BaseFacetSet subclasses must define get_queryset()') 
+        raise NotImplementedError('BaseFacetSet subclasses must define get_queryset()')
 
     def get_schemata(self):
         return self.get_queryset().model.get_schemata_for_model()
