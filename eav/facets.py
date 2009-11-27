@@ -144,7 +144,9 @@ class BaseFacetSet(object):
         return iter(self.object_list)
 
     def __len__(self):
-        return self.object_list.count()
+        if self.object_list:
+            return self.object_list.count()
+        return 0
 
     def get_queryset(self, **kwargs):
         raise NotImplementedError('BaseFacetSet subclasses must define get_queryset()')
