@@ -86,7 +86,7 @@ class TextFacet(Facet):
 
 
 class ManyToManyFacet(Facet):
-    field_class = forms.models.ModelChoiceField
+    field_class = forms.models.ModelMultipleChoiceField
 
     def _get_queryset(self):
         assert self.schema.datatype == self.schema.TYPE_MANY
@@ -99,6 +99,10 @@ class ManyToManyFacet(Facet):
             'queryset': self._get_queryset(),
             'widget': forms.CheckboxSelectMultiple,
         }
+
+    def get_lookups(self, value):
+        "Returns dictionary of lookups for facet-specific query."
+        return {'%s__in' % self.lookup_name: value} if value else {}
 
 
 class IntegerFacet(Facet):

@@ -33,6 +33,9 @@ class BaseEntityManager(Manager):
         return qs
 
     def _filter_by_lookup(self, qs, lookup, value):
+
+        # TODO: refactor (make recursive resolving of sublookups)
+
         fields   = self.model._meta.get_all_field_names()
         schemata = dict((s.name, s) for s in self.model.get_schemata_for_model())
 
@@ -50,13 +53,17 @@ class BaseEntityManager(Manager):
                 # check if sublookup is another schema
                 # TODO: handle nested sublookups (probably these blocks should be taken out of the Manager)
                 related_schemata = dict((s.name, s) for s in related_model.get_schemata_for_model())
-                if sublookup in related_schemata:
+                if '__' in lookup:
+                    subname, subsublookup = sublookup.split('__', 1)
+                else:
+                    subname, subsublookup = sublookup, None
+                if subname in related_schemata:
                     # EAV attribute (Attr instance linked to entity)
-                    schema = related_schemata.get(sublookup)
+                    schema = related_schemata.get(subname)
                     if schema.datatype == schema.TYPE_MANY:
-                        d = self._filter_by_m2m_schema(qs, sublookup, None, value, schema, model=related_model)
+                        d = self._filter_by_m2m_schema(qs, subname, subsublookup, value, schema, model=related_model)
                     else:
-                        d = self._filter_by_simple_schema(qs, sublookup, None, value, schema)
+                        d = self._filter_by_simple_schema(qs, subname, subsublookup, value, schema)
                     prefixed = dict(('%s__%s' % (name, k), v) for k, v in d.items())
                     #assert 1==0, (schema, prefixed)
                     return prefixed
