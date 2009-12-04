@@ -75,7 +75,7 @@ class TextFacet(Facet):
             attrs = self.facet_set.get_queryset()
             field_name = self.attr_name
         choices = set(attrs.values_list(field_name, flat=True).distinct())
-        return [(x,x) for x in choices]
+        return [('', _('any'))] + [(x,x) for x in choices]
 
     @property
     def extra(self):
