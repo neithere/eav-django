@@ -121,7 +121,7 @@ ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" ins
 >>> fs.filterable_names
 ['price', 'colour', 'size', 'taste']
 >>> fs.facets
-[<TextFacet: Item price>, <TextFacet: Colour>, <TextFacet: Size>, <TextFacet: Taste>]
+[<TextFacet: Item price>, <TextFacet: Colour>, <ManyToManyFacet: Size>, <TextFacet: Taste>]
 >>> [x for x in fs]
 [<Entity: Apple>, <Entity: T-shirt>, <Entity: Orange>, <Entity: Tangerine>, <Entity: Old Dog>]
 >>> [x for x in FacetSet({'colour': 'yellow'})]

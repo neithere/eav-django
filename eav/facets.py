@@ -68,9 +68,6 @@ class TextFacet(Facet):
     @property
     def _choices(self):
         if self.schema:
-            if self.schema.datatype == self.schema.TYPE_MANY:
-                return [(x.pk, x) for x in self.schema.get_choices()]   # TODO: intersection with entity and, maybe, FacetSet?
-
             # FIXME implementation details exposed ###########
             attrs = self.schema.attrs.all()    # FIXME in shop don't need *all* attrs, just those in rubric
             field_name = 'value_%s' % self.schema.datatype
@@ -86,6 +83,22 @@ class TextFacet(Facet):
         if len(self._choices) < 5:
             d['widget'] = forms.RadioSelect
         return d
+
+
+class ManyToManyFacet(Facet):
+    field_class = forms.models.ModelChoiceField
+
+    def _get_queryset(self):
+        assert self.schema.datatype == self.schema.TYPE_MANY
+        # TODO: intersection with entity and, maybe, FacetSet?
+        return self.schema.get_choices()
+
+    @property
+    def extra(self):
+        return {
+            'queryset': self._get_queryset(),
+            'widget': forms.CheckboxSelectMultiple,
+        }
 
 
 class IntegerFacet(Facet):
@@ -122,7 +135,7 @@ FACET_FOR_DATATYPE_DEFAULTS = {
     'int':  RangeFacet, #IntegerFacet,
     'date': DateFacet,
     'bool': BooleanFacet,
-    'many': TextFacet,
+    'many': ManyToManyFacet,
 }
 
 FACET_FOR_FIELD_DEFAULTS = {
