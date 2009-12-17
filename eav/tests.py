@@ -130,7 +130,7 @@ ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" ins
 [<Entity: Orange>, <Entity: Tangerine>, <Entity: Old Dog>]
 >>> [x for x in FacetSet({'colour': 'orange', 'taste': 'sweet'})]
 [<Entity: Orange>, <Entity: Tangerine>]
->>> [x for x in FacetSet({'size': large.pk})]
+>>> [x for x in FacetSet({'size': [large.pk]})]
 [<Entity: T-shirt>, <Entity: Old Dog>]
 """
 

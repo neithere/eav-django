@@ -115,6 +115,7 @@ class RangeFacet(Facet):
     def get_lookups(self, value):
         if not value:
             return {}
+        # XXX what about __lt ?
         if not value.stop:
             return {'%s__gt' % self.lookup_name: value.start}
         return {'%s__range' % self.lookup_name: (value.start or 0, value.stop)}
