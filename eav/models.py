@@ -40,14 +40,14 @@ class BaseSchema(Model):
     Metadata for an attribute.
     """
     TYPE_TEXT    = 'text'
-    TYPE_INTEGER = 'int'
+    TYPE_FLOAT   = 'float'
     TYPE_DATE    = 'date'
     TYPE_BOOLEAN = 'bool'
     TYPE_MANY    = 'many'
 
     DATATYPE_CHOICES = (
         (TYPE_TEXT,    _('text')),
-        (TYPE_INTEGER, _('number')),
+        (TYPE_FLOAT,   _('number')),
         (TYPE_DATE,    _('date')),
         (TYPE_BOOLEAN, _('boolean')),
         (TYPE_MANY,    _('multiple choices')),
@@ -281,7 +281,7 @@ class BaseAttribute(Model):
     entity = generic.GenericForeignKey(ct_field="entity_type", fk_field='entity_id')
 
     value_text = TextField(blank=True, null=True)
-    value_int = IntegerField(blank=True, null=True)
+    value_float = FloatField(blank=True, null=True)
     value_date = DateField(blank=True, null=True)
     value_bool = NullBooleanField(blank=True)    # TODO: ensure that form invalidates null booleans (??)
 
