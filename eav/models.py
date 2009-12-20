@@ -58,7 +58,7 @@ class BaseSchema(Model):
                              editable=True, blank=True, slugify=slugify_attr_name)
     help_text = CharField(_('help text'), max_length=250, blank=True,
                           help_text=_('short description for administrator'))
-    datatype = CharField(_('data type'), max_length=4, choices=DATATYPE_CHOICES)
+    datatype = CharField(_('data type'), max_length=5, choices=DATATYPE_CHOICES)
 
     required = BooleanField(_('required'))
     searched = BooleanField(_('include in search'))  # i.e. full-text search? mb for text only

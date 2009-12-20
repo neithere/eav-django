@@ -12,7 +12,7 @@
 >>> colour.name              #  <-- automatically generated from title
 'colour'
 >>> taste = Schema.objects.create(title='Taste', datatype=Schema.TYPE_TEXT)
->>> age = Schema.objects.create(title='Age', datatype=Schema.TYPE_INTEGER)
+>>> age = Schema.objects.create(title='Age', datatype=Schema.TYPE_FLOAT)
 >>> can_haz = Schema.objects.create(title='I can haz it', datatype=Schema.TYPE_BOOLEAN)
 >>> can_haz.name
 'i_can_haz_it'
@@ -77,7 +77,7 @@ ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" ins
 [<Choice: S>, <Choice: L>]
 >>> Attr.objects.all()
 [<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">, \
-<Attr: T-shirt: Size "S">, <Attr: T-shirt: Size "L">]
+<Attr: T-shirt: Size "L">, <Attr: T-shirt: Size "S">]
 
 ##
 ## combined

@@ -136,11 +136,11 @@ class BooleanFacet(Facet):
 
 
 FACET_FOR_DATATYPE_DEFAULTS = {
-    'text': TextFacet,
-    'int':  RangeFacet, #IntegerFacet,
-    'date': DateFacet,
-    'bool': BooleanFacet,
-    'many': ManyToManyFacet,
+    'text':  TextFacet,
+    'float': RangeFacet, #IntegerFacet,
+    'date':  DateFacet,
+    'bool':  BooleanFacet,
+    'many':  ManyToManyFacet,
 }
 
 FACET_FOR_FIELD_DEFAULTS = {
