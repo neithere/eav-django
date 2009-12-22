@@ -5,7 +5,7 @@ from copy import deepcopy
 
 # django
 from django.forms import (BooleanField, CharField, CheckboxSelectMultiple,
-                          DateField, IntegerField, ModelForm, ModelMultipleChoiceField,    #MultipleChoiceField,
+                          DateField, FloatField, ModelForm, ModelMultipleChoiceField,    #MultipleChoiceField,
                           ValidationError)
 from django.contrib.admin.widgets import AdminDateWidget    #, RelatedFieldWidgetWrapper
 from django.utils.translation import ugettext_lazy as _
@@ -42,7 +42,7 @@ class BaseDynamicEntityForm(ModelForm):
 
     FIELD_CLASSES = {
         'text': CharField,
-        'int':  IntegerField,
+        'float': FloatField,
         'date': DateField,
         'bool': BooleanField,
         'many': ModelMultipleChoiceField,    #RelatedFieldWidgetWrapper(MultipleChoiceField),
