@@ -7,7 +7,7 @@ from copy import deepcopy
 from django.forms import (BooleanField, CharField, CheckboxSelectMultiple,
                           DateField, FloatField, ModelForm, ModelMultipleChoiceField,    #MultipleChoiceField,
                           ValidationError)
-from django.contrib.admin.widgets import AdminDateWidget    #, RelatedFieldWidgetWrapper
+from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple    #, RelatedFieldWidgetWrapper
 from django.utils.translation import ugettext_lazy as _
 
 # this app
@@ -49,8 +49,11 @@ class BaseDynamicEntityForm(ModelForm):
     }
     FIELD_EXTRA = {
         'date': {'widget': AdminDateWidget},
-        #'many': {'widget': FilteredSelectMultiple('xxx verbose name xxx', is_stacked=False)},
-        #'many': {'widget': CheckboxSelectMultiple},
+        'many': lambda schema: {
+            'widget': CheckboxSelectMultiple
+                      if len(schema.get_choices()) <= 5 else
+                      FilteredSelectMultiple(schema.title, is_stacked=False)
+        },
     }
     def __init__(self, data=None, *args, **kwargs):
         super(BaseDynamicEntityForm, self).__init__(data, *args, **kwargs)
@@ -85,7 +88,10 @@ class BaseDynamicEntityForm(ModelForm):
                 defaults.update({'queryset': schema.get_choices(),
                                  'initial': [x.pk for x in choices]})
 
-            defaults.update(self.FIELD_EXTRA.get(datatype, {}))
+            extra = self.FIELD_EXTRA.get(datatype, {})
+            if hasattr(extra, '__call__'):
+                extra = extra(schema)
+            defaults.update(extra)
 
             MappedField = self.FIELD_CLASSES[datatype]
             self.fields[schema.name] = MappedField(**defaults)

@@ -236,6 +236,11 @@ class BaseEntity(Model):
             self.get_schemata()
         return self._schemata_cache_dict[name]
 
+    def get_schema_by_id(self, schema_id):
+        for schema in self.get_schemata():
+            if schema.pk == schema_id:
+                return schema
+
     def check_eav_allowed(self):
         """
         Returns True if entity instance allows EAV attributes to be attached.
@@ -270,6 +275,7 @@ class BaseChoice(Model):
 
     class Meta:
         abstract = True
+        ordering = ('title',)
 
     def __unicode__(self):
         return self.title   #u'%s "%s"' % (self.schema.title, self.title)
