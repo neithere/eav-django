@@ -75,9 +75,9 @@ ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" ins
 >>> e3 = Entity.objects.get(pk=e.pk)
 >>> e3.size
 [<Choice: S>, <Choice: L>]
->>> Attr.objects.all()
-[<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">, \
-<Attr: T-shirt: Size "L">, <Attr: T-shirt: Size "S">]
+>>> Attr.objects.all().order_by('schema', 'choice__id')
+[<Attr: Apple: Colour "yellow">, <Attr: T-shirt: Size "S">,\
+ <Attr: T-shirt: Size "L">, <Attr: Apple: Taste "sweet">]
 
 ##
 ## combined
