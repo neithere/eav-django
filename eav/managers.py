@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+# TODO: .filter(size__isnull=True) --> .exclude(attrs__schema='size')
+
 from django.db.models import Manager
 
 
