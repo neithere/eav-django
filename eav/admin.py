@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # django
-from django.contrib.admin import helpers, site, ModelAdmin, TabularInline
-from django.utils.translation import ugettext_lazy as _
+from django.contrib.admin import helpers, ModelAdmin
 from django.utils.safestring import mark_safe
-
-# 3rd-party
-from view_shortcuts.decorators import render_to
 
 
 class BaseEntityAdmin(ModelAdmin):

@@ -10,10 +10,6 @@ from django.forms import (BooleanField, CharField, CheckboxSelectMultiple,
 from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple    #, RelatedFieldWidgetWrapper
 from django.utils.translation import ugettext_lazy as _
 
-# this app
-from models import BaseEntity
-#from widgets import PlainTextWidget
-
 
 __all__ = ['BaseSchemaForm', 'BaseDynamicEntityForm']
 
@@ -128,6 +124,6 @@ class BaseDynamicEntityForm(ModelForm):
         return instance
     save.alters_data = True
 
-    def save_m2m(*a, **kw):
+    def save_m2m(self, *a, **kw):
         # stub for admin    TODO: check if we don't need to super() if entity indeed has m2m
         pass

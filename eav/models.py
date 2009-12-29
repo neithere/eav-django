@@ -1,23 +1,17 @@
 # -*- coding: utf-8 -*-
 
-# python
-import warnings
-
 # django
-from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
-from django.core.urlresolvers import reverse
-from django.db.models import (BooleanField, CharField, DateField, DateTimeField,
-                              FloatField, ForeignKey, ImageField, IntegerField,
-                              Manager, ManyToManyField, Model, NullBooleanField,
-                              Q, PositiveIntegerField, TextField)
+from django.db.models import (BooleanField, CharField, DateField, FloatField,
+                              ForeignKey, IntegerField, Model, NullBooleanField,
+                              TextField)
 from django.utils.translation import ugettext_lazy as _
 
 # 3rd-party
 from autoslug.fields import AutoSlugField
 from autoslug.settings import slugify
-from view_shortcuts.decorators import cached_property
+#from view_shortcuts.decorators import cached_property
 
 # this app
 from managers import BaseEntityManager
@@ -181,6 +175,7 @@ class BaseEntity(Model):
 
         # TODO: think about use cases; are we doing it right?
         #if not self.check_eav_allowed():
+        #    import warnings
         #    warnings.warn('EAV attributes are going to be saved along with entity'
         #                  ' despite %s.check_eav_allowed() returned False.'
         #                  % type(self), RuntimeWarning)
