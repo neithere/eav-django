@@ -1,0 +1,142 @@
+EAV-Django
+==========
+
+EAV-Django is a reusable Django application which provides an implementation of
+the Entity-Attribute-Value data model.
+
+    Entity-Attribute-Value model (EAV), also known as object-attribute-value
+    model and open schema which is used in circumstances where the number of
+    attributes (properties, parameters) that can be used to describe a thing (an
+    "entity" or "object") is potentially very vast, but the number that will
+    actually apply to a given entity is relatively modest.
+
+    (see the [Wikipedia article]_ for more details)
+
+    .. [Wikipedia article] http://en.wikipedia.org/wiki/Entity-attribute-value_model
+
+EAV-Django works fine with traditional RDBMS (tested on SQLite and MySQL).
+
+The application grew from an online shop project, so it is pretty practical and
+not just an academic exercise. Flexibility and
+
+All provided models are abstract, i.e. EAV-Django does not store any information
+in its own tables. Instead, it provides a basis for your own models which will
+have support for EAV out of the box. The EAV API includes:
+
+    * *Create/update/access:* model instances provide standart API for both
+      "real" and EAV attributes. The abstraction, however, does not stand in
+      your way and provides means to deal with the underlying stuff.
+    * *Query:* BaseEntityManager includes uniform approach in `filter()` and
+      `exclude()` to query "real" and EAV attributes.
+    * Customizable *schemata for attributes*.
+    * *Admin:* all dynamic attributes can be represented and modified in the
+      Django admin with no or little effort (using `eav.admin.BaseEntityAdmin`).
+      Schemata can be edited separately, as ordinary Django model objects.
+    * *Facets:* facet search is an important feature of online shops, catalogues,
+      etc. Basically you will need a form representing a certain subset of model
+      attributes with appropriate widgets and choices so that the user can choose
+      desirable values of some properties, submit the form and get a list of
+      matching items. In general case django-filter would do, but it won't work
+      with EAV, so EAV-Django provides a complete set of tools for that.
+
+Examples
+--------
+
+Let's define an EAV-friendly model, create an EAV attribute and see how it
+behaves. By "EAV attributes" I mean those stored in the database as separate
+objects but accessed and searched in such a way as if they were columns in the
+entity's table.
+
+    from django.db import models
+    from eav.models import BaseEntity, BaseSchema, BaseAttribute
+
+    class Fruit(BaseEntity):
+        title = models.CharField(max_length=50)
+
+    class Schema(BaseSchema):
+        pass
+
+    class Attr(BaseAttribute):
+        schema = models.ForeignKey(Schema, related_name='attrs')
+
+    # in Python shell:
+
+    # define attribute named "colour"
+    >>> colour = Schema.objects.create(
+    ...     name = 'colour',               # if omitted, populated from title
+    ...     title = 'Colour',
+    ...     datatype = Schema.TYPE_TEXT    # or: float, bool, date, m2m
+    )
+
+    # create an entity
+    >>> e = Fruit.objects.create(title='Apple', colour='green')
+
+    # define "real" and EAV attributes the same way
+    >>> e.title
+    'Apple'
+    >>> e.colour
+    'green'
+
+    >>> e.save()    # deals with EAV attributes automatically
+
+    # list EAV attributes as Attr instances
+    >>> e.attrs.all()
+    [<Attr: Apple: Colour "green">]
+
+    # search by an EAV attribute as if it was an ordinary field
+    >>> Fruit.objects.filter(colour='yellow')
+    [<Fruit: Apple>]
+
+    # all compound lookups are supported
+    >>> Fruit.objects.filter(colour__contains='yell')
+    [<Fruit: Apple>]
+
+Note that we can access, modify and query `colour` as if it was a true Entity
+field, but at the same time its name, type and even existance are completely
+defined by a Schema instance. A Schema object can be understood as a class, and
+related Attr objects are its instances. In other words, Schema objects are like
+CharField, IntegerField and such, only defined on data level, not hard-coded in
+Python. And they can be "instantiated" for any Entity (unless you put custom
+constraints which are outside of EAV-Django's area of responsibility).
+
+Also note that in the above example we've only played with a text attribute.
+EAV-Django supports text, float, date, boolean and m2m schemata. The many-to-many
+is a special case as it involves an extra model for choices. EAV-Django provides
+an abstract model but requires you to define a concrete model (e.g. Choice), and
+point to it from the attribute model (i.e. put foreign key named "choice"). The
+Choice model will also have to point at Schema.
+
+See tests for more examples.
+
+Documentation
+-------------
+
+Sorry, no documentation yet. I'll work on it when I get a round tuit. :-)
+
+For now please see tests, they contain good examples of model definitions and
+queries.
+
+Author
+------
+
+This application was initially created by Andrey Mikhaylenko. For complete list
+of contributors consult the AUTHORS file.
+
+Please feel free to file issues and/or submit patches.
+
+Licensing
+---------
+
+EAV-Django is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public License as
+published by the Free Software Foundation; either version 3 of the
+License, or (at your option) any later version.
+
+EAV-Django is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this program; see the file COPYING.LESSER. If not,
+see `GNU licenses <http://gnu.org/licenses/>`_.
