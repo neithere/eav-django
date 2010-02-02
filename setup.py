@@ -28,7 +28,7 @@ readme = open(os.path.join(os.path.dirname(__file__), 'README')).read()
 
 setup(
     # overview
-    name     = 'EAV-Django',
+    name     = 'eav-django',
     description  = ('a reusable Django application which implements the '
                     'Entity-Attribute-Value data model.'),
     long_description = readme,
