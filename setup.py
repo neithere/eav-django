@@ -34,7 +34,7 @@ setup(
     long_description = readme,
 
     # technical info
-    version  = '1.0.1',
+    version  = '1.0.2',
     packages = find_packages(),
     requires = ['python (>= 2.5)', 'django (>= 1.1)', 
                 'django_autoslug (>= 1.3.9)'],
