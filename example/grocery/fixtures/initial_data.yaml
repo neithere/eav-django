@@ -1,0 +1,77 @@
+- fields: {app_label: grocery, model: fruit, name: fruit}
+  model: contenttypes.contenttype
+  pk: 9                                                                                
+- fields: {app_label: grocery, model: schema, name: schema}
+  model: contenttypes.contenttype
+  pk: 10
+- fields: {app_label: grocery, model: choice, name: choice}
+  model: contenttypes.contenttype
+  pk: 11 
+- fields: {app_label: grocery, model: attr, name: attribute}
+  model: contenttypes.contenttype
+  pk: 12
+- fields: {datatype: float, filtered: true, help_text: '', name: price, required: false,
+    searched: false, sortable: true, title: Price}
+  model: grocery.schema
+  pk: 3
+- fields: {datatype: text, filtered: true, help_text: '', name: variety, required: false,
+    searched: false, sortable: false, title: Variety}
+  model: grocery.schema
+  pk: 2
+- fields: {datatype: many, filtered: true, help_text: a visual property, name: colour,
+    required: false, searched: true, sortable: false, title: Colour}
+  model: grocery.schema
+  pk: 1
+- fields: {schema: 1, title: Black}
+  model: grocery.choice
+  pk: 6
+- fields: {schema: 1, title: Blue}
+  model: grocery.choice
+  pk: 4
+- fields: {schema: 1, title: Green}
+  model: grocery.choice
+  pk: 1
+- fields: {schema: 1, title: Red}
+  model: grocery.choice
+  pk: 2
+- fields: {schema: 1, title: White}
+  model: grocery.choice
+  pk: 5
+- fields: {schema: 1, title: Yellow}
+  model: grocery.choice
+  pk: 3
+- fields: {title: Green Apple}
+  model: grocery.fruit
+  pk: 1
+- fields: {title: Greenish Apple}
+  model: grocery.fruit
+  pk: 2
+- fields: {choice: null, entity_id: 1, entity_type: 9, schema: 3, value_bool: null,
+    value_date: null, value_float: 10.5, value_text: null}
+  model: grocery.attr
+  pk: 1
+- fields: {choice: null, entity_id: 1, entity_type: 9, schema: 2, value_bool: null,
+    value_date: null, value_float: null, value_text: Apple}
+  model: grocery.attr
+  pk: 2
+- fields: {choice: 1, entity_id: 1, entity_type: 9, schema: 1, value_bool: null, value_date: null,
+    value_float: null, value_text: null}
+  model: grocery.attr
+  pk: 3
+- fields: {choice: null, entity_id: 2, entity_type: 9, schema: 3, value_bool: null,
+    value_date: null, value_float: 9.9900000000000002, value_text: null}
+  model: grocery.attr
+  pk: 4
+- fields: {choice: null, entity_id: 2, entity_type: 9, schema: 2, value_bool: null,
+    value_date: null, value_float: null, value_text: Apple}
+  model: grocery.attr
+  pk: 5
+- fields: {choice: 1, entity_id: 2, entity_type: 9, schema: 1, value_bool: null, value_date: null,
+    value_float: null, value_text: null}
+  model: grocery.attr
+  pk: 6
+- fields: {choice: 2, entity_id: 2, entity_type: 9, schema: 1, value_bool: null, value_date: null,
+    value_float: null, value_text: null}
+  model: grocery.attr
+  pk: 7
+

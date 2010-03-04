@@ -34,9 +34,10 @@ setup(
     long_description = readme,
 
     # technical info
-    version  = '1.0.0',
+    version  = '1.0.1',
     packages = find_packages(),
-    requires = ['python (>= 2.5)', 'django (>= 1.1)'],
+    requires = ['python (>= 2.5)', 'django (>= 1.1)', 
+                'django_autoslug (>= 1.3.9)'],
     provides = ['eav'],
 
     # copyright
