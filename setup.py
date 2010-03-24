@@ -21,7 +21,7 @@
 
 
 import os
-from setuptools import find_packages, setup
+from setuptools import setup
 
 
 readme = open(os.path.join(os.path.dirname(__file__), 'README')).read()
@@ -35,8 +35,8 @@ setup(
 
     # technical info
     version  = '1.0.2',
-    packages = find_packages(),
-    requires = ['python (>= 2.5)', 'django (>= 1.1)', 
+    packages = ['eav'],
+    requires = ['python (>= 2.5)', 'django (>= 1.1)',
                 'django_autoslug (>= 1.3.9)'],
     provides = ['eav'],
 
