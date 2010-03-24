@@ -73,7 +73,7 @@ class BaseEntityManager(Manager):
                 # check if sublookup is another schema
                 # TODO: handle nested sublookups (probably these blocks should be taken out of the Manager)
                 related_schemata = dict((s.name, s) for s in related_model.get_schemata_for_model())
-                if '__' in lookup:
+                if '__' in sublookup:
                     subname, subsublookup = sublookup.split('__', 1)
                 else:
                     subname, subsublookup = sublookup, None
