@@ -28,6 +28,9 @@ from django.forms import (BooleanField, CharField, CheckboxSelectMultiple,
 from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple    #, RelatedFieldWidgetWrapper
 from django.utils.translation import ugettext_lazy as _
 
+# this app
+from fields import RangeField
+
 
 __all__ = ['BaseSchemaForm', 'BaseDynamicEntityForm']
 
@@ -60,6 +63,7 @@ class BaseDynamicEntityForm(ModelForm):
         'date': DateField,
         'bool': BooleanField,
         'many': ModelMultipleChoiceField,    #RelatedFieldWidgetWrapper(MultipleChoiceField),
+        'range': RangeField,
     }
     FIELD_EXTRA = {
         'date': {'widget': AdminDateWidget},

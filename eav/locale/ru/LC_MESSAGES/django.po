@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-12-04 12:13+0500\n"
+"POT-Creation-Date: 2010-04-21 17:39+0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Andy Mikhailenko <andy@neithere.net>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,87 +15,96 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: facets.py:78
+#: facets.py:96
 msgid "any"
 msgstr "не важно"
 
-#: forms.py:29
+#: forms.py:46
 #, python-format
 msgid "Attribute name must not clash with reserved names (\"%s\")"
 msgstr "Имя атрибута не должно относиться к зарезервированным (\"%s\")"
 
-#: models.py:49
+#: models.py:62
 msgid "text"
 msgstr "текст"
 
-#: models.py:50
+#: models.py:63
 msgid "number"
 msgstr "число"
 
-#: models.py:51
+#: models.py:64
 msgid "date"
 msgstr "дата"
 
-#: models.py:52
+#: models.py:65
 msgid "boolean"
 msgstr "логическое значение"
 
-#: models.py:53
+#: models.py:66
 msgid "multiple choices"
 msgstr "множественный выбор"
 
-#: models.py:56
+#: models.py:67
+msgid "numeric range"
+msgstr "числовой диапазон"
+
+#: models.py:70
 msgid "title"
 msgstr "заголовок"
 
-#: models.py:56
+#: models.py:70
 msgid "user-friendly attribute name"
 msgstr "название атрибута, отображаемое на сайте"
 
-#: models.py:57
+#: models.py:71
 msgid "name"
 msgstr "имя поля"
 
-#: models.py:59
+#: models.py:73
 msgid "help text"
 msgstr "подсказка"
 
-#: models.py:60
+#: models.py:74
 msgid "short description for administrator"
 msgstr "краткое описание для администратора"
 
-#: models.py:61
+#: models.py:75
 msgid "data type"
 msgstr "тип данных"
 
-#: models.py:63 models.py:75
+#: models.py:77 models.py:89
 msgid "required"
 msgstr "обязателен"
 
-#: models.py:64
+#: models.py:78
 msgid "include in search"
 msgstr "с поиском"
 
-#: models.py:65
+#: models.py:79
 msgid "include in filters"
 msgstr "с фильтрацией"
 
-#: models.py:66
+#: models.py:80
 msgid "allow sorting"
 msgstr "с сортировкой"
 
-#: models.py:70
+#: models.py:84
 msgid "schema"
 msgstr "описание свойства"
 
-#: models.py:70
+#: models.py:84
 msgid "schemata"
 msgstr "описания свойств"
 
-#: models.py:293
+#: models.py:322
 msgid "attribute"
 msgstr "свойство"
 
-#: models.py:293
+#: models.py:322
 msgid "attributes"
 msgstr "свойства"
+
+#: widgets.py:41
+#, python-format
+msgid "%(min)s to %(max)s"
+msgstr "от %(min)s до %(max)s"

@@ -128,16 +128,26 @@ class IntegerFacet(Facet):
 
 
 class RangeFacet(Facet):
+    "A simple range facet: two widgets, one attribute value (number)."
     field_class = RangeField
 
     def get_lookups(self, value):
         if not value:
             return {}
         # XXX what about __lt ?
-        if not value.stop:
-            return {'%s__gt' % self.lookup_name: value.start}
-        return {'%s__range' % self.lookup_name: (value.start or 0, value.stop)}
+        start, stop = value
+        if not start:
+            return {'%s__gt' % self.lookup_name: start}
+        return {'%s__range' % self.lookup_name: (start or 0, stop)}
 
+
+class MultiRangeFacet(Facet):
+    "A complex range facet: two widgets, two attribute values (numbers)."
+    field_class = RangeField
+
+    def get_lookups(self, value):
+        # we assume that this goes through the custom manager's filter()
+        return {self.lookup_name: value} if value else {}
 
 class DateFacet(Facet):
     field_class = forms.DateField
@@ -156,6 +166,7 @@ class BooleanFacet(Facet):
 FACET_FOR_DATATYPE_DEFAULTS = {
     'text':  TextFacet,
     'float': RangeFacet, #IntegerFacet,
+    'range': MultiRangeFacet,
     'date':  DateFacet,
     'bool':  BooleanFacet,
     'many':  ManyToManyFacet,

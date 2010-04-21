@@ -58,6 +58,71 @@
 [<Entity: Apple>]
 
 ##
+## range
+##
+
+>>> weight_range = Schema.objects.create(name='weight_range',
+...                                      title='Weight range',
+...                                      datatype=Schema.TYPE_RANGE)
+>>> e = Entity.objects.all()[0]    # reload schemata cache
+
+# try setting wrong values
+
+>>> e.weight_range = 1
+>>> e.save()
+Traceback (most recent call last):
+...
+TypeError: Range value must be an iterable, got "1".
+
+
+>>> e.weight_range = 1, 2, 3
+>>> e.save()
+Traceback (most recent call last):
+...
+ValueError: Range value must consist of two elements, got 3.
+
+>>> e.weight_range = 1, 'wrong type'
+>>> e.save()
+Traceback (most recent call last):
+...
+TypeError: Range value must consist of two numbers, got "1" and "wrong type" instead.
+
+>>> e.weight_range = 3, 1
+>>> e.save()
+Traceback (most recent call last):
+...
+ValueError: Range must consist of min and max values (min <= max) but got "3" and "1" instead.
+
+# okay, now set a correct value
+
+>>> e.weight_range = 1, 3
+>>> e.save()
+
+>>> Attr.objects.all().order_by('schema', 'choice__id')
+[<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">,\
+ <Attr: Apple: Weight range "(1.0, 3.0)">]
+
+# check if queries work
+
+>>> Entity.objects.filter(weight_range__overlaps=(1, 4))
+[<Entity: Apple>]
+>>> Entity.objects.filter(weight_range__overlaps=(0, None))
+[<Entity: Apple>]
+>>> Entity.objects.filter(weight_range__overlaps=(None, 5))
+[<Entity: Apple>]
+>>> Entity.objects.filter(weight_range__overlaps=(0, 0))
+[]
+>>> Entity.objects.filter(weight_range__overlaps=(None, 0))
+[]
+>>> Entity.objects.filter(weight_range__overlaps=(4, None))
+[]
+>>> Entity.objects.filter(weight_range__overlaps=(-5, 0))
+[]
+>>> Entity.objects.filter(weight_range__overlaps=(-5, 1))
+[<Entity: Apple>]
+
+
+##
 ## many-to-one
 ##
 
@@ -80,14 +145,16 @@
 >>> e3 = Entity.objects.get(pk=e.pk)
 >>> e3.size
 [<Choice: M>, <Choice: L>]
->>> Attr.objects.all()
-[<Attr: Apple: Colour "yellow">, <Attr: Apple: Taste "sweet">, \
-<Attr: T-shirt: Size "M">, <Attr: T-shirt: Size "L">]
+>>> Attr.objects.all().order_by('schema', 'choice__id')
+[<Attr: Apple: Colour "yellow">, <Attr: T-shirt: Size "M">,\
+ <Attr: T-shirt: Size "L">, <Attr: Apple: Taste "sweet">,\
+ <Attr: Apple: Weight range "(1.0, 3.0)">\
+]
 >>> e2.size = ['wrong choice']
 >>> e2.save()
 Traceback (most recent call last):
     ...
-ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" instance.
+TypeError: Cannot assign "wrong choice": "Attr.choice" must be a BaseChoice instance.
 >>> e2.size = [small, large]
 >>> e2.save()
 >>> e3 = Entity.objects.get(pk=e.pk)
@@ -95,7 +162,9 @@ ValueError: Cannot assign "'wrong choice'": "Attr.choice" must be a "Choice" ins
 [<Choice: S>, <Choice: L>]
 >>> Attr.objects.all().order_by('schema', 'choice__id')
 [<Attr: Apple: Colour "yellow">, <Attr: T-shirt: Size "S">,\
- <Attr: T-shirt: Size "L">, <Attr: Apple: Taste "sweet">]
+ <Attr: T-shirt: Size "L">, <Attr: Apple: Taste "sweet">,\
+ <Attr: Apple: Weight range "(1.0, 3.0)">\
+]
 
 ##
 ## combined

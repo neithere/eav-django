@@ -23,6 +23,9 @@
 from django.db.models import Manager
 
 
+RANGE_INTERSECTION_LOOKUP = 'overlaps'
+
+
 class BaseEntityManager(Manager):
 
     # TODO: refactor filter() and exclude()   -- see django.db.models.manager and ...query
@@ -82,6 +85,8 @@ class BaseEntityManager(Manager):
                     schema = related_schemata.get(subname)
                     if schema.datatype == schema.TYPE_MANY:
                         d = self._filter_by_m2m_schema(qs, subname, subsublookup, value, schema, model=related_model)
+                    elif schema.datatype == schema.TYPE_RANGE:
+                        d = self._filter_by_range_schema(qs, subname, subsublookup, value, schema)
                     else:
                         d = self._filter_by_simple_schema(qs, subname, subsublookup, value, schema)
                     prefixed = dict(('%s__%s' % (name, k), v) for k, v in d.items())
@@ -95,6 +100,8 @@ class BaseEntityManager(Manager):
             schema = schemata.get(name)
             if schema.datatype == schema.TYPE_MANY:
                 return self._filter_by_m2m_schema(qs, name, sublookup, value, schema)
+            elif schema.datatype == schema.TYPE_RANGE:
+                return self._filter_by_range_schema(qs, name, sublookup, value, schema)
             else:
                 return self._filter_by_simple_schema(qs, lookup, sublookup, value, schema)
         else:
@@ -115,6 +122,42 @@ class BaseEntityManager(Manager):
             'attrs__schema': schema,
             str(value_lookup): value
         }
+
+    def _filter_by_range_schema(self, qs, lookup, sublookup, value, schema):
+        """
+        Filters given entity queryset by an attribute which is linked to given
+        range schema. Lookups `between` yields items that lie not completely
+        within given range but have intersection with it. For example, and item
+        with x=(2,5) will match q=(3,None) or q=(0,3). See tests for details.
+
+            qs.filter(weight_range__between=(1,3))
+            qs.filter(weight_range__between=(1,None))
+
+        """
+        # This code was written with a single use case in mind. That use case
+        # required searching for objects whose ranges *intersect* with given
+        # one. I did not invest time in supporting other use cases (such as
+        # checking whether the ranges are exactly the same or how they are
+        # different). However, such lookups *can* be added later without
+        # breaking existing client code. Patches are welcome.
+        sublookup = sublookup or RANGE_INTERSECTION_LOOKUP
+        if not sublookup == RANGE_INTERSECTION_LOOKUP:
+            raise ValueError('Range schema only supports lookup "%s".' %
+                             RANGE_INTERSECTION_LOOKUP)
+        try:
+            _, _ = value
+        except ValueError:
+            raise ValueError('Range schema value must be a tuple of min and '
+                             'max values; one of them may be None.')
+        value_lookups = zip((
+            'attrs__value_range_max__gte',
+            'attrs__value_range_min__lte',
+        ), value)
+        conditions = dict((k,v) for k,v in value_lookups if v is not None)
+        conditions.update({
+            'attrs__schema': schema,
+        })
+        return conditions
 
     def _filter_by_m2m_schema(self, qs, lookup, sublookup, value, schema, model=None):
         """

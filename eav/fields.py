@@ -30,12 +30,10 @@ class RangeField(forms.MultiValueField):
 
     def __init__(self, *args, **kwargs):
         fields = (
-            forms.IntegerField(),
-            forms.IntegerField(),
+            forms.FloatField(),
+            forms.FloatField(),
         )
         super(RangeField, self).__init__(fields, *args, **kwargs)
 
     def compress(self, data_list):
-        if data_list:
-            return slice(*data_list)
-        return None
+        return tuple(data_list) or None

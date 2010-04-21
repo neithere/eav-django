@@ -56,6 +56,7 @@ class BaseSchema(Model):
     TYPE_DATE    = 'date'
     TYPE_BOOLEAN = 'bool'
     TYPE_MANY    = 'many'
+    TYPE_RANGE   = 'range'
 
     DATATYPE_CHOICES = (
         (TYPE_TEXT,    _('text')),
@@ -63,6 +64,7 @@ class BaseSchema(Model):
         (TYPE_DATE,    _('date')),
         (TYPE_BOOLEAN, _('boolean')),
         (TYPE_MANY,    _('multiple choices')),
+        (TYPE_RANGE,   _('numeric range')),
     )
 
     title    = CharField(_('title'), max_length=100, help_text=_('user-friendly attribute name'))
@@ -129,13 +131,14 @@ class BaseSchema(Model):
         else:
             self._save_single_attr(entity, value)
 
-    def _save_single_attr(self, entity, value=None, schema=None, create_nulls=False, extra={}):
+    def _save_single_attr(self, entity, value=None, schema=None,
+                          create_nulls=False, extra={}):
         """
         Creates or updates an EAV attribute for given entity with given value.
 
         :param schema: schema for attribute. Default it current schema instance.
         :param create_nulls: boolean: if True, even attributes with value=None
-            are created (be default they are skipped).
+            are created (by default they are skipped).
         :param extra: dict: additional data for Attr instance (e.g. title).
         """
         # If schema is not many-to-one, the value is saved to the corresponding
@@ -155,11 +158,16 @@ class BaseSchema(Model):
 
     def _save_m2m_attr(self, entity, value):
 
-        # drop all attributes for this entity/schema pair
-        self.get_attrs(entity).delete()
-
         if not hasattr(value, '__iter__'):
             value = [value]
+
+        if not all(isinstance(x, BaseChoice) for x in value):
+            raise TypeError('Cannot assign "%s": "Attr.choice" '
+                            'must be a BaseChoice instance.'
+                            % ', '.join(value))
+
+        # drop all attributes for this entity/schema pair
+        self.get_attrs(entity).delete()
 
         # Attr instances for corresponding managed m2m schemata are updated
         for choice in value:
@@ -303,6 +311,8 @@ class BaseAttribute(Model):
     value_float = FloatField(blank=True, null=True)
     value_date = DateField(blank=True, null=True)
     value_bool = NullBooleanField(blank=True)    # TODO: ensure that form invalidates null booleans (??)
+    value_range_min = FloatField(blank=True, null=True)
+    value_range_max = FloatField(blank=True, null=True)
 
     schema = NotImplemented    # must be FK
     choice = NotImplemented    # must be nullable FK
@@ -319,12 +329,52 @@ class BaseAttribute(Model):
     def _get_value(self):
         if self.schema.datatype == self.schema.TYPE_MANY:
             return self.choice
+        if self.schema.datatype == self.schema.TYPE_RANGE:
+            names = ('value_range_%s' % x for x in ('min', 'max'))
+            value = tuple(getattr(self, x, None) for x in names)
+            return None if value == (None, None) else value
         return getattr(self, 'value_%s' % self.schema.datatype)
 
     def _set_value(self, new_value):
-        setattr(self, 'value_%s' % self.schema.datatype, new_value)
+        if self.schema.datatype == self.schema.TYPE_RANGE:
+            new_value = new_value or (None, None)
+
+            # validate range value -- expecting a tuple of two numbers
+            try:
+                validate_range_value(new_value)
+            except (TypeError, ValueError):
+                raise
+
+            for k,v in zip('min max'.split(), new_value):
+                v = v if v is None else float(v)
+                setattr(self, 'value_range_%s' % k, v)
+        else:
+            setattr(self, 'value_%s' % self.schema.datatype, new_value)
 
     value = property(_get_value, _set_value)
+
+
+def validate_range_value(value):
+    """
+    Validates given value against `Schema.TYPE_RANGE` data type. Raises
+    TypeError or ValueError if something is wrong. Returns None if everything
+    is OK.
+    """
+    if value == (None, None):
+        return
+
+    if not hasattr(value, '__iter__'):
+        raise TypeError('Range value must be an iterable, got "%s".' % value)
+    if not 2 == len(value):
+        raise ValueError('Range value must consist of two elements, got %d.' %
+                         len(value))
+    if not all(isinstance(x, (int,float)) for x in value):
+        raise TypeError('Range value must consist of two numbers, got "%s" '
+                        'and "%s" instead.' % value)
+    if not value[0] <= value[1]:
+        raise ValueError('Range must consist of min and max values (min <= '
+                         'max) but got "%s" and "%s" instead.' % value)
+    return
 
 
 # xxx catch signal Attr.post_save() --> update attr.item.attribute_cache (JSONField or such)

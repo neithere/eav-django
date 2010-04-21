@@ -19,6 +19,7 @@
 #    along with EAV-Django.  If not, see <http://gnu.org/licenses/>.
 
 from django import forms
+from django.utils.translation import ugettext_lazy as _
 
 
 class RangeWidget(forms.MultiWidget):
@@ -29,9 +30,9 @@ class RangeWidget(forms.MultiWidget):
         super(RangeWidget, self).__init__(widgets, attrs)
 
     def decompress(self, value):
-        if value:
-            return [value.start, value.stop]
-        return [None, None]
+        return value or [None, None]
 
     def format_output(self, rendered_widgets):
-        return u'-'.join(rendered_widgets)
+        names = 'min max'.split()
+        pairs = zip(names, rendered_widgets)
+        return _('%(min)s to %(max)s') % dict(pairs)
