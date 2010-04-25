@@ -18,6 +18,9 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with EAV-Django.  If not, see <http://gnu.org/licenses/>.
 
+# TODO: Revamp the whole stuff to add metaclass-based API.
+#       The thing works well as it is but the client code could be more readable.
+
 # python
 from itertools import chain
 
@@ -38,7 +41,8 @@ class Facet(object):
     def __init__(self, facet_set, schema=None, field=None, lookup_prefix=''):
         self.facet_set = facet_set
         assert schema or field, 'Facet must be created with schema or field'
-        assert not (schema and field), 'Facet cannot be created with both schema and field'
+        assert not (schema and field), (
+            'Facet cannot be created with both schema and field')
         self.schema = schema
         self.field = field
         self.lookup_prefix = lookup_prefix
@@ -47,13 +51,15 @@ class Facet(object):
         return u'<%s: %s>' % (self.__class__.__name__, unicode(self))
 
     def __unicode__(self):
-        return unicode(self.schema.title if self.schema else self.field.verbose_name)
+        return unicode(self.schema.title if self.schema
+                                       else self.field.verbose_name)
 
     extra = {}
 
     @property
     def field_class(self):
-        raise NotImplementedError('Facet subclasses must specify form field class')
+        raise NotImplementedError('Facet subclasses must specify '
+                                  'the form field class.')
 
     @property
     def widget(self):
@@ -62,7 +68,8 @@ class Facet(object):
     @property
     def form_field(self):
         "Returns appropriate form field."
-        defaults = dict(required=False, label=unicode(self), widget=self.widget)
+        label = unicode(self)
+        defaults = dict(required=False, label=label, widget=self.widget)
         defaults.update(self.extra)
         return self.field_class(**defaults)
 
@@ -81,13 +88,30 @@ class Facet(object):
 
 
 class TextFacet(Facet):
+    """
+    Represents a text field or schema. Allows one choice at a time. Displays
+    a set of radiobuttons. If there are many choices, the radiobuttons are
+    replaced with a drop-down select box.
+
+    Inherits param from `Facet`. Provides these additional params:
+
+    :param max_radio_choices: integer: if there are less choices than given
+        number, then radiobuttons are used; if more, then drop-down select box
+        is used.
+    """
     field_class = forms.ChoiceField
+
+    def __init__(self, *args, **kwargs):
+        self.max_radio_choices = kwargs.pop('max_radio_choices', 5)
+        super(TextFacet, self).__init__(*args, **kwargs)
 
     @property
     def _choices(self):
         if self.schema:
             # FIXME implementation details exposed ###########
-            attrs = self.schema.attrs.all()    # FIXME in shop don't need *all* attrs, just those in rubric
+            # FIXME in some cases (e.g. shop) we don't need *all* attrs, it
+            #       would be better to fine-filter them (e.g. by rubric).
+            attrs = self.schema.attrs.all()
             field_name = 'value_%s' % self.schema.datatype
         else:
             attrs = self.facet_set.get_queryset()
@@ -98,9 +122,26 @@ class TextFacet(Facet):
     @property
     def extra(self):
         d = {'choices': self._choices}
-        if len(self._choices) < 5:
+        if len(self._choices) < self.max_radio_choices:
             d['widget'] = forms.RadioSelect
         return d
+
+
+class MultiTextFacet(TextFacet):
+    """
+    Represents a text field or schema. Allows multiple choices.
+    """
+    field_class = forms.MultipleChoiceField
+    widget = forms.CheckboxSelectMultiple
+
+    _choices = TextFacet._choices
+
+    @property
+    def extra(self):
+        return {'choices': self._choices}
+
+    def get_lookups(self, value):
+        return {'%s__in' % self.lookup_name: value} if value else {}
 
 
 class ManyToManyFacet(Facet):
@@ -128,7 +169,9 @@ class IntegerFacet(Facet):
 
 
 class RangeFacet(Facet):
-    "A simple range facet: two widgets, one attribute value (number)."
+    """
+    A simple range facet: two widgets, one attribute value (number).
+    """
     field_class = RangeField
 
     def get_lookups(self, value):
@@ -142,12 +185,15 @@ class RangeFacet(Facet):
 
 
 class MultiRangeFacet(Facet):
-    "A complex range facet: two widgets, two attribute values (numbers)."
+    """
+    A complex range facet: two widgets, two attribute values (numbers).
+    """
     field_class = RangeField
 
     def get_lookups(self, value):
         # we assume that this goes through the custom manager's filter()
         return {self.lookup_name: value} if value else {}
+
 
 class DateFacet(Facet):
     field_class = forms.DateField
@@ -180,6 +226,7 @@ FACET_FOR_FIELD_DEFAULTS = {
 class BaseFacetSet(object):
     filterable_fields = []
     sortable_fields = []
+    custom_facets = {}
 
     def __getitem__(self, k):
         return self.object_list[k]
@@ -232,10 +279,12 @@ class BaseFacetSet(object):
                 schema, lookup_prefix = self.get_schema_and_lookup(name)
             except KeyError:    # XXX  are we sure it will raise KeyError? depends on implementation!
                 field, lookup_prefix = self.get_field_and_lookup(name)
-                FacetClass = FACET_FOR_FIELD_DEFAULTS.get(type(field), TextFacet)
+                FacetClass = self.custom_facets.get(name, None)
+                FacetClass = FacetClass or FACET_FOR_FIELD_DEFAULTS.get(type(field), TextFacet)
                 yield FacetClass(self, field=field, lookup_prefix=lookup_prefix)
             else:
-                FacetClass = FACET_FOR_DATATYPE_DEFAULTS[schema.datatype]
+                FacetClass = self.custom_facets.get(name, None)
+                FacetClass = FacetClass or FACET_FOR_DATATYPE_DEFAULTS[schema.datatype]
                 yield FacetClass(self, schema=schema, lookup_prefix=lookup_prefix)
 
     @cached_property
@@ -246,7 +295,8 @@ class BaseFacetSet(object):
     def form(self):
         if not hasattr(self, '_form'):
             fields = SortedDict([(facet.attr_name, facet.form_field) for facet in self.facets])
-            FormClass = type('%sForm' % self.__class__.__name__, (forms.Form,), fields)        # XXX maybe add rubric slug?
+            class_name = '%sForm' % self.__class__.__name__   # XXX maybe add rubric slug?
+            FormClass = type(class_name, (forms.Form,), fields)
             self._form = FormClass(self.data)
         return self._form
 
