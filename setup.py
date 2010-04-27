@@ -34,7 +34,7 @@ setup(
     long_description = readme,
 
     # technical info
-    version  = '1.2.1',
+    version  = '1.2.2',
     packages = ['eav'],
     requires = ['python (>= 2.5)', 'django (>= 1.1)',
                 'django_autoslug (>= 1.3.9)'],

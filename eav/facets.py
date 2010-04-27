@@ -105,8 +105,7 @@ class TextFacet(Facet):
         self.max_radio_choices = kwargs.pop('max_radio_choices', 5)
         super(TextFacet, self).__init__(*args, **kwargs)
 
-    @property
-    def _choices(self):
+    def _get_choices(self, blank=False):
         if self.schema:
             # FIXME implementation details exposed ###########
             # FIXME in some cases (e.g. shop) we don't need *all* attrs, it
@@ -117,12 +116,14 @@ class TextFacet(Facet):
             attrs = self.facet_set.get_queryset()
             field_name = self.attr_name
         choices = set(attrs.values_list(field_name, flat=True).distinct())
-        return [('', _('any'))] + [(x,x) for x in choices]
+        blank_choice = [('', _('any'))] if blank else []
+        return blank_choice + [(x,x) for x in choices]
 
     @property
     def extra(self):
-        d = {'choices': self._choices}
-        if len(self._choices) < self.max_radio_choices:
+        choices = self._get_choices(blank=True)
+        d = {'choices': choices}
+        if len(choices) < self.max_radio_choices:
             d['widget'] = forms.RadioSelect
         return d
 
@@ -134,11 +135,10 @@ class MultiTextFacet(TextFacet):
     field_class = forms.MultipleChoiceField
     widget = forms.CheckboxSelectMultiple
 
-    _choices = TextFacet._choices
-
     @property
     def extra(self):
-        return {'choices': self._choices}
+        choices = self._get_choices(blank=False)
+        return {'choices': choices}
 
     def get_lookups(self, value):
         return {'%s__in' % self.lookup_name: value} if value else {}
