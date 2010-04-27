@@ -328,7 +328,7 @@ class BaseFacetSet(object):
         try:
             lookups = self.get_lookups()
         except forms.ValidationError:
-            return []
+            return self.get_queryset().none()
         lookups = dict((str(k),v) for k,v in lookups.items())
 
         # assume to use the EntityManager's smart filter()
