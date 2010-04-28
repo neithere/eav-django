@@ -130,8 +130,8 @@ class BaseEntityManager(Manager):
         within given range but have intersection with it. For example, and item
         with x=(2,5) will match q=(3,None) or q=(0,3). See tests for details.
 
-            qs.filter(weight_range__between=(1,3))
-            qs.filter(weight_range__between=(1,None))
+            qs.filter(weight_range__overlaps=(1,3))
+            qs.filter(weight_range__overlaps=(1,None))
 
         """
         # This code was written with a single use case in mind. That use case
@@ -149,6 +149,9 @@ class BaseEntityManager(Manager):
         except ValueError:
             raise ValueError('Range schema value must be a tuple of min and '
                              'max values; one of them may be None.')
+        except TypeError:
+            raise TypeError('Expected a two-tuple, got "%s"' % value)
+
         value_lookups = zip((
             'attrs__value_range_max__gte',
             'attrs__value_range_min__lte',

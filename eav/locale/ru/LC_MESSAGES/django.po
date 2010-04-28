@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2010-04-21 17:39+0600\n"
+"POT-Creation-Date: 2010-04-27 16:31+0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Andy Mikhailenko <andy@neithere.net>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,7 +15,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: facets.py:96
+#: facets.py:119
 msgid "any"
 msgstr "не важно"
 
@@ -104,7 +104,7 @@ msgstr "свойство"
 msgid "attributes"
 msgstr "свойства"
 
-#: widgets.py:41
+#: widgets.py:38
 #, python-format
 msgid "%(min)s to %(max)s"
 msgstr "от %(min)s до %(max)s"
