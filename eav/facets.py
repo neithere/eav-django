@@ -175,12 +175,13 @@ class RangeFacet(Facet):
     field_class = RangeField
 
     def get_lookups(self, value):
-        if not value:
+        if not value or not any(value):
             return {}
-        # XXX what about __lt ?
         start, stop = value
-        if not start:
+        if start and not stop:
             return {'%s__gt' % self.lookup_name: start}
+        if stop and not start:
+            return {'%s__lt' % self.lookup_name: stop}
         return {'%s__range' % self.lookup_name: (start or 0, stop)}
 
 
