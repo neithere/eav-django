@@ -18,8 +18,15 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with EAV-Django.  If not, see <http://gnu.org/licenses/>.
 
+__all__ = ['BaseEntityAdmin', 'BaseSchemaAdmin', 'BaseEntityStackedInline']
+
+
 # django
-from django.contrib.admin import helpers, ModelAdmin
+from django.contrib.admin import helpers
+from django.contrib.admin.options import (
+    ModelAdmin, InlineModelAdmin, StackedInline
+)
+from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 
 
@@ -38,15 +45,52 @@ class BaseEntityAdmin(ModelAdmin):
 
         # infer correct data from the form
         fieldsets = [(None, {'fields': form.fields.keys()})]
-        adminform = helpers.AdminForm(form, fieldsets, self.prepopulated_fields)
+        adminform = helpers.AdminForm(form, fieldsets,
+                                      self.prepopulated_fields)
         media = mark_safe(self.media + adminform.media)
 
         context.update(adminform=adminform, media=media)
 
-        return super(BaseEntityAdmin, self).render_change_form(request, context, **kwargs)
+        super_meth = super(BaseEntityAdmin, self).render_change_form
+        return super_meth(request, context, **kwargs)
 
 
 class BaseSchemaAdmin(ModelAdmin):
 
     list_display = ('title', 'name', 'datatype', 'help_text', 'required')
     prepopulated_fields = {'name': ('title',)}
+
+
+class BaseEntityInlineFormSet(BaseInlineFormSet):
+    """
+    An inline formset that correctly initializes EAV forms.
+    """
+    def add_fields(self, form, index):
+        if self.instance:
+            setattr(form.instance, self.fk.name, self.instance)
+            form._build_dynamic_fields()
+        super(BaseEntityInlineFormSet, self).add_fields(form, index)
+
+
+class BaseEntityInline(InlineModelAdmin):
+    """
+    Inline model admin that works correctly with EAV attributes. Stacked
+    representation is used by default. You can mix in the standard
+    TabularInline class in order to switch the representation.
+
+    .. warning: TabularInline does *not* work out of the box. There is,
+        however, a patched template `admin/edit_inline/tabular.html` bundled
+        with EAV-Django. You can copy or symlink the `admin` directory to your
+        templates search path (see Django documentation).
+
+    """
+    formset = BaseEntityInlineFormSet
+
+    def get_fieldsets(self, request, obj=None):
+        if self.declared_fieldsets:
+            return self.declared_fieldsets
+        formset = self.get_formset(request)
+        kw = {self.fk_name or formset.fk.name} if obj else {}
+        instance = self.model(**kw)
+        form = formset.form(request.POST, instance=instance)
+        return [(None, {'fields': form.fields.keys()})]
