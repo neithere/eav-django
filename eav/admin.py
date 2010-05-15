@@ -74,9 +74,13 @@ class BaseEntityInlineFormSet(BaseInlineFormSet):
 
 class BaseEntityInline(InlineModelAdmin):
     """
-    Inline model admin that works correctly with EAV attributes. Stacked
-    representation is used by default. You can mix in the standard
-    TabularInline class in order to switch the representation.
+    Inline model admin that works correctly with EAV attributes. You should mix
+    in the standard StackedInline or TabularInline classes in order to define
+    formset representation, e.g.::
+
+        class ItemInline(BaseEntityInline, StackedInline):
+            model = Item
+            form = forms.ItemForm
 
     .. warning: TabularInline does *not* work out of the box. There is,
         however, a patched template `admin/edit_inline/tabular.html` bundled
@@ -89,8 +93,11 @@ class BaseEntityInline(InlineModelAdmin):
     def get_fieldsets(self, request, obj=None):
         if self.declared_fieldsets:
             return self.declared_fieldsets
+
         formset = self.get_formset(request)
-        kw = {self.fk_name or formset.fk.name: obj} if obj else {}
+        fk_name = self.fk_name or formset.fk.name
+        kw = {fk_name: obj} if obj else {}
         instance = self.model(**kw)
         form = formset.form(request.POST, instance=instance)
+
         return [(None, {'fields': form.fields.keys()})]
