@@ -90,7 +90,7 @@ class BaseEntityInline(InlineModelAdmin):
         if self.declared_fieldsets:
             return self.declared_fieldsets
         formset = self.get_formset(request)
-        kw = {self.fk_name or formset.fk.name} if obj else {}
+        kw = {self.fk_name or formset.fk.name: obj} if obj else {}
         instance = self.model(**kw)
         form = formset.form(request.POST, instance=instance)
         return [(None, {'fields': form.fields.keys()})]
