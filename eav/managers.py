@@ -73,8 +73,13 @@ class BaseEntityManager(Manager):
             except AttributeError:
                 pass
             else:
+                if not hasattr(related_model, 'get_schemata_for_model'):
+                    # okay, treat as ordinary model field
+                    return {lookup: value}
+
                 # check if sublookup is another schema
                 # TODO: handle nested sublookups (probably these blocks should be taken out of the Manager)
+
                 related_schemata = dict((s.name, s) for s in related_model.get_schemata_for_model())
                 if '__' in sublookup:
                     subname, subsublookup = sublookup.split('__', 1)
