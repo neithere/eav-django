@@ -170,6 +170,7 @@ Sorry, no documentation yet. I'll work on it when I get a round tuit. :-)
 For now please see:
 
 * tests, as they contain good examples of model definitions and queries;
+* the bundled example ("grocery shop", comes with fixtures);
 * the `discussion group <http://groups.google.com/group/eav-django/>`_.
 
 Author
