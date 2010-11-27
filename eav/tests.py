@@ -28,12 +28,12 @@
 >>> colour
 <Schema: Colour (text)>
 >>> colour.name              #  <-- automatically generated from title
-'colour'
+u'colour'
 >>> taste = Schema.objects.create(title='Taste', datatype=Schema.TYPE_TEXT)
 >>> age = Schema.objects.create(title='Age', datatype=Schema.TYPE_FLOAT)
 >>> can_haz = Schema.objects.create(title='I can haz it', datatype=Schema.TYPE_BOOLEAN)
 >>> can_haz.name
-'i_can_haz_it'
+u'i_can_haz_it'
 >>> e = Entity.objects.create(title='Apple', colour='green')
 >>> e.title
 'Apple'

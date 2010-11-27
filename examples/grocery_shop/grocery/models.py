@@ -24,7 +24,7 @@ class Choice(BaseChoice):
     schema = models.ForeignKey(Schema, related_name='choices')
 
 
-class Attr(BaseAttribute):
+class Attribute(BaseAttribute):
     schema = models.ForeignKey(Schema, related_name='attrs')
     choice = models.ForeignKey(Choice, blank=True, null=True)
 
