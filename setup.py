@@ -34,10 +34,11 @@ setup(
     long_description = readme,
 
     # technical info
-    version  = '1.3.3',
+    version  = '1.3.4',
     packages = ['eav'],
     requires = ['python (>= 2.5)', 'django (>= 1.1)',
-                'django_autoslug (>= 1.3.9)'],
+                'django_autoslug (>= 1.3.9)',
+                'django_view_shortcuts (>= 1.3.5)'],
     provides = ['eav'],
 
     # copyright

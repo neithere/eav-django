@@ -67,6 +67,9 @@ class BaseEntityManager(Manager):
         else:
             name, sublookup = lookup, None
 
+        if name == 'pk':
+            name = self.model._meta.pk.name
+
         if name in fields:
             try:
                 related_model = getattr(self.model, name).related.model
